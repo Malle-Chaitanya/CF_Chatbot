@@ -4,11 +4,26 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# LLM Provider Configuration - Choose between "openai" or "gemini"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
+if LLM_PROVIDER not in ["openai", "gemini"]:
+    raise ValueError("LLM_PROVIDER must be either 'openai' or 'gemini'")
+
 # OpenAI API Key - Get your key from https://platform.openai.com/api-keys
+# Required if LLM_PROVIDER is set to "openai"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable is required")
-os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+if LLM_PROVIDER == "openai":
+    if not OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY environment variable is required when LLM_PROVIDER is 'openai'")
+    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+
+# Google Gemini API Key - Get your key from https://aistudio.google.com/app/apikey
+# Required if LLM_PROVIDER is set to "gemini"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if LLM_PROVIDER == "gemini":
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY environment variable is required when LLM_PROVIDER is 'gemini'")
+    os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 # Microsoft OAuth Configuration
 MICROSOFT_CLIENT_ID = os.getenv("MICROSOFT_CLIENT_ID")

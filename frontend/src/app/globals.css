@@ -1865,6 +1865,146 @@ header img {
   flex: 1;
 }
 
+.continue-thread-btn {
+  margin-left: auto;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  background-color: #0129ac;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.continue-thread-btn:hover {
+  background-color: #010f5e;
+}
+
+.continue-thread-btn:active {
+  transform: scale(0.98);
+}
+
+/* Chat Header Styles */
+.chat-header {
+  width: 100%;
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.chat-header-content {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.read-only-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.read-only-badge svg {
+  flex-shrink: 0;
+  color: #d97706;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.header-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.header-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.header-btn:active {
+  transform: scale(0.98);
+}
+
+.header-btn svg {
+  flex-shrink: 0;
+}
+
+.continue-button {
+  background: #0129ac;
+  color: white;
+  border-color: #0129ac;
+}
+
+.continue-button:hover {
+  background: #010f5e;
+  border-color: #010f5e;
+}
+
+.share-button svg {
+  color: #6b7280;
+}
+
+.share-button:hover svg {
+  color: #374151;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 640px) {
+  .chat-header {
+    padding: 10px 12px;
+  }
+  
+  .chat-header-content {
+    flex-wrap: wrap;
+  }
+  
+  .header-btn span {
+    display: none;
+  }
+  
+  .header-btn {
+    padding: 8px 12px;
+  }
+  
+  .read-only-badge span {
+    font-size: 12px;
+  }
+}
+
 .sidebar-footer {
   padding: 8px;
   border-top: 1px solid #ececf1;

@@ -4,6 +4,7 @@ from langchain_core.callbacks.base import BaseCallbackHandler
 from langchain_openai import ChatOpenAI
 # RetrievalQA is now handled differently in langchain 1.x
 from config import SYSTEM_PROMPT
+from app.llm_factory import get_llm
 
 
 class AsyncStreamHandler(BaseCallbackHandler):
@@ -114,10 +115,10 @@ def setup_qa_chain(retriever):
         ("human", "Context: {context}\n\nQuestion: {question}")
     ])
     
-    llm = ChatOpenAI(
-        model_name="gpt-4o-mini",  # Updated model name
-        streaming=True, 
+    # Use factory function to get the appropriate LLM based on configuration
+    llm = get_llm(
         temperature=0.1,  # Low temperature for consistent, deterministic responses
+        streaming=True, 
         max_tokens=1500   # Allow longer responses for comprehensive answers
     )
     
@@ -150,8 +151,7 @@ def setup_qa_chain(retriever):
             try:
                 # Use the LLM with ZERO temperature to create deterministic rephrasings
                 # This ensures consistent retrieval for the same query
-                rephrase_llm = ChatOpenAI(
-                    model_name="gpt-4o-mini",
+                rephrase_llm = get_llm(
                     temperature=0.0,  # Zero temperature for deterministic rephrasing
                     max_tokens=200
                 )
@@ -297,8 +297,6 @@ def generate_recommended_questions_from_docs(user_question: str, retrieved_docs:
         return _generate_simple_keyword_recommendations(user_question)
     
     try:
-        from langchain_openai import ChatOpenAI
-        
         # Extract relevant content and metadata from retrieved docs
         docs_content = []
         topics_set = set()
@@ -338,9 +336,8 @@ Return ONLY a valid JSON array of questions, nothing else.
 Example format: ["Question 1?", "Question 2?", "Question 3?", "Question 4?"]
 """
 
-        # Use a small, fast LLM call
-        llm = ChatOpenAI(
-            model_name="gpt-4o-mini",
+        # Use a small, fast LLM call with factory function
+        llm = get_llm(
             temperature=0.7,  # Some creativity for diverse questions
             max_tokens=200    # Keep it minimal
         )

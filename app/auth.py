@@ -11,12 +11,25 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
 from typing import Optional, Dict
 import logging
+from typing import Set
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # OAuth2 Bearer token security scheme
 security = HTTPBearer()
+
+# Restricted admin allowlist (lowercase for consistent comparison)
+ADMIN_EMAILS: Set[str] = {
+    "laxman.kadari@cloudfuze.com",
+    "chaitanya.malle@cloudfuze.com",
+    "nirosh.reddy@cloudfuze.com"
+}
+
+
+def _normalize_email(email: str) -> str:
+    """Normalize email for case-insensitive comparisons."""
+    return (email or "").strip().lower()
 
 
 async def get_current_user(
@@ -168,6 +181,29 @@ async def require_admin(
         )
     
     logger.info(f"Admin access granted to {current_user['id']} ({current_user['email']})")
+    return current_user
+
+
+async def require_restricted_admin(
+    current_user: dict = Depends(get_current_user)
+) -> dict:
+    """
+    Verify that the authenticated user is in the explicit admin allowlist.
+    
+    Admins: laxman.kadari@cloudfuze.com, chaitanya.malle@cloudfuze.com, nirosh.reddy@cloudfuze.com
+    """
+    email = _normalize_email(current_user.get("email", ""))
+    
+    if email not in ADMIN_EMAILS:
+        logger.warning(
+            f"Restricted admin access denied for user {current_user.get('id')} ({current_user.get('email')})"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrative access required (restricted allowlist).",
+        )
+    
+    logger.info(f"Restricted admin access granted to {current_user.get('id')} ({current_user.get('email')})")
     return current_user
 
 

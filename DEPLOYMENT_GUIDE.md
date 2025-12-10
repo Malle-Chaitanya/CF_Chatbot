@@ -1,246 +1,453 @@
-# Deployment Guide for CF_Chatbot_Dev
+# Share Functionality - Production Deployment Guide
 
-This guide explains how to deploy the CF_Chatbot_Dev code to different environments.
+## Overview
+This guide explains how the Share functionality handles different scenarios in a production environment.
 
-## Deployment Environments
+---
 
-1. **newcf3.cloudfuze.com** - Development/Testing environment (deploy first)
-2. **ai.cloudfuze.com** - Production environment (deploy after testing)
+## 1. DEPLOYMENT INFRASTRUCTURE
 
-## Prerequisites
+### Frontend Deployment
+**Technology**: Next.js (static + server-side rendering)
+**Hosting Options**:
+- Vercel (recommended - native Next.js support)
+- AWS Amplify
+- Self-hosted with Nginx/Apache
 
-- Ubuntu server (20.04 or later recommended)
-- SSH access to the server
-- Domain DNS configured to point to the server IP
-- API keys and credentials ready
+**Key Consideration**:
+- Share links point to `http://localhost:3000` in development
+- **In production**: Must point to actual domain (e.g., `https://app.cloudfuze.com`)
 
-## Deployment Steps
+### Backend Deployment
+**Technology**: FastAPI + Python
+**Hosting Options**:
+- AWS EC2 / ECS
+- Google Cloud Run
+- Azure Container Instances
+- Self-hosted servers
 
-### Step 1: Deploy to newcf3.cloudfuze.com (Development)
+**Key Consideration**:
+- Backend must be accessible from users' machines
+- CORS must be properly configured
+- HTTPS required in production
 
-1. **SSH into the server:**
-   ```bash
-   ssh user@newcf3.cloudfuze.com
-   ```
+### Database Deployment
+**Technology**: MongoDB Atlas or Self-hosted MongoDB
+**Requirements**:
+- `shared_chats` collection with proper indexes
+- Regular backups
+- Connection string security
 
-2. **Clone or pull the latest code:**
-   ```bash
-   cd /opt
-   git clone <repository-url> slack2teams-newcf3
-   # OR if already exists:
-   cd slack2teams-newcf3
-   git pull origin CF_Chatbot_Dev
-   ```
+---
 
-3. **Navigate to the project directory:**
-   ```bash
-   cd slack2teams-newcf3
-   ```
+## 2. SHARE LINK GENERATION IN PRODUCTION
 
-4. **Make the deployment script executable:**
-   ```bash
-   chmod +x deploy-newcf3.sh
-   ```
+### Current Development Flow
+```
+Frontend (localhost:3000)
+    ↓
+Backend API (localhost:8002)
+    ↓
+MongoDB (local instance)
+```
 
-5. **Run the deployment script:**
-   ```bash
-   ./deploy-newcf3.sh
-   ```
+### Production Flow
+```
+Frontend (https://app.cloudfuze.com)
+    ↓
+Backend API (https://api.cloudfuze.com or same domain)
+    ↓
+MongoDB Atlas (cloud-hosted)
+```
 
-6. **Configure environment variables:**
-   - Edit `.env.prod` file with your actual API keys and credentials
-   - Required variables:
-     - `OPENAI_API_KEY`
-     - `MICROSOFT_CLIENT_ID`
-     - `MICROSOFT_CLIENT_SECRET`
-     - `MICROSOFT_TENANT`
-     - `MONGODB_URL`
-     - `LANGFUSE_PUBLIC_KEY` (optional)
-     - `LANGFUSE_SECRET_KEY` (optional)
+### Share Link Format
 
-7. **Restart services after updating .env.prod:**
-   ```bash
-   cd /opt/slack2teams-newcf3
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod down
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
-   ```
+**Development**:
+```
+http://localhost:3000/chat/shared/f98d906d-d68e-42de-a415-e001e4afa0c9
+```
 
-8. **Verify deployment:**
-   - Check health endpoint: `https://newcf3.cloudfuze.com/health`
-   - Test the application functionality
-   - Review logs: `docker-compose -f docker-compose.prod.yml logs -f`
+**Production**:
+```
+https://app.cloudfuze.com/chat/shared/f98d906d-d68e-42de-a415-e001e4afa0c9
+```
 
-### Step 2: Test on newcf3.cloudfuze.com
+### Configuration Changes Needed
 
-Before deploying to production, thoroughly test:
-- [ ] Application loads correctly
-- [ ] Authentication works
-- [ ] Chat functionality works
-- [ ] API endpoints respond correctly
-- [ ] SSL certificate is valid
-- [ ] All features work as expected
+**File**: `frontend/src/lib/chat-initialization.ts`
 
-### Step 3: Deploy to ai.cloudfuze.com (Production)
+**Current Code** (Line 752):
+```typescript
+const API_BASE_URL = getApiBase();
+```
 
-Once testing on newcf3.cloudfuze.com is complete:
+**getApiBase() function** (needs to be production-aware):
+```typescript
+function getApiBase(): string {
+  if (typeof window === 'undefined') return '';
+  
+  // Development
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://127.0.0.1:8002';
+  }
+  
+  // Production
+  const env = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudfuze.com';
+  return env;
+}
+```
 
-1. **SSH into the production server:**
-   ```bash
-   ssh user@ai.cloudfuze.com
-   ```
+**Environment Variables Setup**:
 
-2. **Clone or pull the latest code:**
-   ```bash
-   cd /opt
-   git clone <repository-url> slack2teams
-   # OR if already exists:
-   cd slack2teams
-   git pull origin CF_Chatbot_Dev
-   ```
+**.env.local** (development):
+```
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8002
+```
 
-3. **Navigate to the project directory:**
-   ```bash
-   cd slack2teams
-   ```
+**.env.production** (production):
+```
+NEXT_PUBLIC_API_BASE_URL=https://api.cloudfuze.com
+NEXT_PUBLIC_APP_URL=https://app.cloudfuze.com
+```
 
-4. **Make the deployment script executable:**
-   ```bash
-   chmod +x deploy-ubuntu.sh
-   ```
+---
 
-5. **Run the deployment script:**
-   ```bash
-   ./deploy-ubuntu.sh
-   ```
+## 3. SHARE LINK HANDLING IN PRODUCTION
 
-6. **Configure environment variables:**
-   - Edit `.env.prod` file with production API keys and credentials
-   - Use production-grade credentials (different from dev if needed)
+### When User Clicks Share Button
 
-7. **Restart services after updating .env.prod:**
-   ```bash
-   cd /opt/slack2teams
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod down
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
-   ```
+**Step 1**: Frontend makes authenticated API call
+```
+POST https://api.cloudfuze.com/chat/share/{sessionId}
+Headers: {
+  Authorization: Bearer {user_token},
+  Content-Type: application/json
+}
+```
 
-8. **Verify production deployment:**
-   - Check health endpoint: `https://ai.cloudfuze.com/health`
-   - Test the application functionality
-   - Monitor logs: `docker-compose -f docker-compose.prod.yml logs -f`
+**Step 2**: Backend validates and generates token
+```python
+# app/endpoints.py (no changes needed!)
+@router.post("/chat/share/{session_id}")
+async def share_chat_session(
+    session_id: str,
+    auth_user: dict = Depends(require_auth)
+):
+    # Validation happens here
+    # Token generation here
+    # MongoDB storage here
+```
 
-## Management Commands
+**Step 3**: Backend returns share URL
+```json
+{
+  "share_token": "f98d906d-d68e-42de-a415-e001e4afa0c9",
+  "share_url": "/chat/shared/f98d906d-d68e-42de-a415-e001e4afa0c9",
+  "message": "Share link created successfully"
+}
+```
 
-### View Logs
+**Step 4**: Frontend builds full URL
+```typescript
+const shareUrl = `${window.location.origin}/chat/shared/${share_token}`;
+// Result: https://app.cloudfuze.com/chat/shared/f98d906d-d68e-42de-a415-e001e4afa0c9
+```
+
+**Step 5**: Copy to clipboard (same as development)
+```typescript
+navigator.clipboard.writeText(shareUrl);
+// Fallback to document.execCommand('copy') if needed
+```
+
+### When Recipient Opens Share Link
+
+**Step 1**: Browser navigates to share link
+```
+https://app.cloudfuze.com/chat/shared/f98d906d-d68e-42de-a415-e001e4afa0c9
+```
+
+**Step 2**: Frontend route `/chat/shared/[token]/page.tsx` loads
+- Extracts token from URL params
+- Makes authenticated request to backend
+
+**Step 3**: Backend retrieves shared chat
+```
+GET https://api.cloudfuze.com/chat/shared/f98d906d-d68e-42de-a415-e001e4afa0c9
+Headers: {
+  Authorization: Bearer {user_token}
+}
+```
+
+**Step 4**: Backend returns chat data
+- Validates token exists
+- Checks token hasn't expired
+- Returns original chat content
+
+**Step 5**: Frontend displays chat in read-only mode
+- Shows "Read-Only" badge
+- Shows "Continue in this thread" button
+- All security protections active
+
+---
+
+## 4. SECURITY CONSIDERATIONS IN PRODUCTION
+
+### Authentication & Authorization
+
+**Protected Endpoints**:
+- ✅ `POST /chat/share/{session_id}` - Requires auth + ownership
+- ✅ `GET /chat/shared/{share_token}` - Requires auth
+- ✅ All message operations - Require auth
+
+**Token Validation**:
+```python
+@router.post("/chat/share/{session_id}")
+async def share_chat_session(
+    session_id: str,
+    auth_user: dict = Depends(require_auth)  # ← Validates Bearer token
+):
+    # Verify user owns the session
+    session = await get_session_by_id(session_id)
+    if session["user_id"] != auth_user["user_id"]:
+        raise HTTPException(status_code=403)
+```
+
+### HTTPS/TLS Requirements
+
+**Production Setup**:
+```nginx
+# Nginx configuration
+server {
+    listen 443 ssl http2;
+    server_name app.cloudfuze.com;
+    
+    ssl_certificate /path/to/certificate.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    location / {
+        proxy_pass http://nextjs:3000;
+    }
+    
+    location /api {
+        proxy_pass https://api.cloudfuze.com;
+    }
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name app.cloudfuze.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+### CORS Configuration
+
+**Backend (FastAPI)** - `server.py`:
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://app.cloudfuze.com",  # Production frontend
+        "https://www.cloudfuze.com",  # With www
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### Rate Limiting
+
+**Recommendation**: Implement rate limiting on share endpoint
+```python
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+@router.post("/chat/share/{session_id}")
+@limiter.limit("10/minute")  # Max 10 shares per minute
+async def share_chat_session(...):
+    # ... endpoint code ...
+```
+
+---
+
+## 5. DATABASE HANDLING IN PRODUCTION
+
+### MongoDB Atlas Setup
+
+**Connection String**:
+```
+mongodb+srv://username:password@cluster0.mongodb.net/chatdb?retryWrites=true&w=majority
+```
+
+**Environment Variable**:
 ```bash
-# For newcf3.cloudfuze.com
-cd /opt/slack2teams-newcf3
-docker-compose -f docker-compose.prod.yml logs -f
-
-# For ai.cloudfuze.com
-cd /opt/slack2teams
-docker-compose -f docker-compose.prod.yml logs -f
+MONGODB_URI=mongodb+srv://username:password@cluster0.mongodb.net/chatdb
 ```
 
-### Restart Services
-```bash
-# For newcf3.cloudfuze.com
-cd /opt/slack2teams-newcf3
-docker-compose -f docker-compose.prod.yml restart
+### Collection & Indexes
 
-# For ai.cloudfuze.com
-cd /opt/slack2teams
-docker-compose -f docker-compose.prod.yml restart
+**Collection**: `shared_chats`
+
+**Indexes Created Automatically** (in `mongodb_memory.py`):
+```python
+await shared_chats_collection.create_index("share_token", unique=True)
+await shared_chats_collection.create_index("session_id")
+await shared_chats_collection.create_index("user_email")
+await shared_chats_collection.create_index("created_at")
 ```
 
-### Stop Services
-```bash
-# For newcf3.cloudfuze.com
-cd /opt/slack2teams-newcf3
-docker-compose -f docker-compose.prod.yml down
+### TTL Index for Expiration (Optional)
 
-# For ai.cloudfuze.com
-cd /opt/slack2teams
-docker-compose -f docker-compose.prod.yml down
+```python
+# Auto-delete expired shares after 30 days
+await shared_chats_collection.create_index(
+    "created_at",
+    expireAfterSeconds=2592000  # 30 days
+)
 ```
 
-### Start Services
-```bash
-# For newcf3.cloudfuze.com
-cd /opt/slack2teams-newcf3
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+---
 
-# For ai.cloudfuze.com
-cd /opt/slack2teams
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+## 6. DEPLOYMENT CHECKLIST
+
+### Pre-Deployment
+
+- [ ] Update `getApiBase()` to support production URLs
+- [ ] Set environment variables in production
+- [ ] Configure CORS for production domain
+- [ ] Set up HTTPS/TLS certificates
+- [ ] Test authentication flow
+- [ ] Verify MongoDB Atlas connection
+- [ ] Set up database backups
+- [ ] Configure rate limiting
+- [ ] Set up security headers (HSTS, CSP, etc.)
+- [ ] Enable logging and monitoring
+
+### Post-Deployment
+
+- [ ] Test share link generation
+- [ ] Test share link access with authentication
+- [ ] Test read-only mode protection
+- [ ] Test "Continue Thread" functionality
+- [ ] Monitor error logs
+- [ ] Check performance metrics
+- [ ] Verify backups are working
+- [ ] Set up alerting for errors
+
+---
+
+## 7. HANDLING DIFFERENT DEPLOYMENT SCENARIOS
+
+### Scenario A: Same Domain Deployment
+**Frontend**: `https://app.cloudfuze.com`
+**Backend**: `https://app.cloudfuze.com/api`
+
+**Changes Needed**:
+```typescript
+// Update API base URL
+const API_BASE_URL = `${window.location.origin}/api`;
 ```
 
-### Check Service Status
-```bash
-# For newcf3.cloudfuze.com
-sudo systemctl status slack2teams-newcf3
+**Benefits**: Simpler CORS, easier deployment
 
-# For ai.cloudfuze.com
-sudo systemctl status slack2teams
+### Scenario B: Separate Domains
+**Frontend**: `https://app.cloudfuze.com`
+**Backend**: `https://api.cloudfuze.com`
+
+**Changes Needed**:
+```typescript
+// Use environment variable
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 ```
 
-## Troubleshooting
+**Benefits**: Independent scaling, separate certificates
 
-### SSL Certificate Issues
-If SSL certificate setup fails:
-1. Ensure DNS is properly configured
-2. Check that ports 80 and 443 are open
-3. Run certbot manually: `sudo certbot certonly --standalone -d <domain>`
+### Scenario C: Subdomain Deployment
+**Frontend**: `https://chat.cloudfuze.com`
+**Backend**: `https://api.cloudfuze.com`
 
-### Service Won't Start
-1. Check logs: `docker-compose -f docker-compose.prod.yml logs`
-2. Verify .env.prod file has all required variables
-3. Check Docker status: `sudo systemctl status docker`
-4. Verify disk space: `df -h`
+**No additional changes** - Works with environment variables
 
-### Application Not Accessible
-1. Check firewall: `sudo ufw status`
-2. Verify nginx is running: `sudo systemctl status nginx`
-3. Check nginx configuration: `sudo nginx -t`
-4. Review nginx logs: `sudo tail -f /var/log/nginx/error.log`
+---
 
-### Backend Health Check Fails
-1. Check backend logs: `docker-compose -f docker-compose.prod.yml logs backend`
-2. Verify MongoDB connection (if using MongoDB)
-3. Check environment variables are correct
-4. Ensure data directory has proper permissions
+## 8. TROUBLESHOOTING IN PRODUCTION
 
-## File Structure
+### Share Link Returns 404
+**Cause**: Token not found in database
+**Solution**: Check MongoDB connection, verify token was saved
 
-```
-/opt/slack2teams-newcf3/          # Development environment
-├── .env.prod                      # Environment variables
-├── docker-compose.prod.yml        # Docker Compose configuration
-├── nginx-newcf3.conf              # Nginx configuration
-├── deploy-newcf3.sh               # Deployment script
-└── ...                            # Application files
+### Clipboard Copy Fails
+**Cause**: HTTPS + security restrictions
+**Solution**: Already handled with fallback to toast notification
 
-/opt/slack2teams/                  # Production environment
-├── .env.prod                      # Environment variables
-├── docker-compose.prod.yml        # Docker Compose configuration
-├── nginx-prod.conf                # Nginx configuration
-├── deploy-ubuntu.sh               # Deployment script
-└── ...                            # Application files
+### Authentication Fails on Share
+**Cause**: Token expired or invalid
+**Solution**: User needs to log in again
+
+### Share Link Opens But Chat Doesn't Load
+**Cause**: API request failing
+**Solution**: Check backend logs, verify API URL in environment
+
+---
+
+## 9. MONITORING & LOGGING
+
+### Key Metrics to Monitor
+```python
+# In backend logs
+- Share creation success/failure rate
+- Share link access rate
+- Average response time for share operations
+- Failed authentication attempts
+- Database connection issues
 ```
 
-## Important Notes
+### Logging Setup
+```python
+import logging
 
-1. **Always test on newcf3.cloudfuze.com first** before deploying to production
-2. **Use different API keys** for dev and production if possible
-3. **Backup data** before major deployments
-4. **Monitor logs** after deployment to catch any issues early
-5. **SSL certificates** are automatically renewed by certbot, but monitor renewal status
+logger = logging.getLogger(__name__)
 
-## Support
+@router.post("/chat/share/{session_id}")
+async def share_chat_session(...):
+    logger.info(f"Share created: {share_token} for user: {auth_user['email']}")
+    logger.error(f"Share failed: {error_message}")
+```
 
-For issues or questions:
-- Check application logs
-- Review Docker container status
-- Verify environment variables
-- Check nginx and system logs
+---
 
+## 10. PRODUCTION DEPLOYMENT SUMMARY
+
+| Component | Development | Production |
+|-----------|-------------|-----------|
+| Frontend URL | `http://localhost:3000` | `https://app.cloudfuze.com` |
+| Backend URL | `http://localhost:8002` | `https://api.cloudfuze.com` |
+| Database | Local MongoDB | MongoDB Atlas |
+| HTTPS | ❌ No | ✅ Required |
+| CORS | ✅ Loose | ✅ Restricted |
+| Authentication | Bearer token | Bearer token + HTTPS |
+| Rate Limiting | ❌ No | ✅ Recommended |
+| Share Link | `http://localhost:3000/chat/shared/...` | `https://app.cloudfuze.com/chat/shared/...` |
+| Clipboard | Browser dependent | Fallback support |
+| Logging | Console | Aggregated logging service |
+
+---
+
+## Conclusion
+
+The Share functionality will work seamlessly in production with minimal configuration changes:
+
+1. **Update API base URL** - Point to production backend
+2. **Set environment variables** - Domain URLs for both frontend and backend
+3. **Configure CORS** - Allow production frontend domain
+4. **Set up HTTPS** - Required for production
+5. **Configure MongoDB Atlas** - Use production database
+6. **Test thoroughly** - Verify all flows work
+
+The architecture is **production-ready** and designed to scale.

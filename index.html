@@ -1257,15 +1257,22 @@
     // Copy message functionality
     async function copyMessage(button) {
       try {
-        // Get the message content (text only, without HTML)
+        // Get the message content
         const messageDiv = button.closest('.message.bot');
         const contentDiv = messageDiv.querySelector('.message-content');
         
-        // Extract text content from the HTML
-        const textContent = contentDiv.textContent || contentDiv.innerText || '';
+        // Copy HTML content to preserve formatting (bold, underline, strikethrough, etc.)
+        // This way, when pasted into rich text editors, all formatting is maintained
+        const htmlToCopy = contentDiv.innerHTML;
         
-        // Copy to clipboard
-        await navigator.clipboard.writeText(textContent);
+        // Use the Clipboard API to copy both HTML and plain text
+        const blob = new Blob([htmlToCopy], { type: 'text/html' });
+        const richTextItem = new ClipboardItem({
+          'text/html': blob,
+          'text/plain': new Blob([contentDiv.innerText || contentDiv.textContent || ''], { type: 'text/plain' })
+        });
+        
+        await navigator.clipboard.write([richTextItem]);
         
         // Show success feedback
         const originalHTML = button.innerHTML;
@@ -1281,16 +1288,35 @@
       } catch (err) {
         console.error('Failed to copy text: ', err);
         
-        // Fallback: show error feedback
-        const originalHTML = button.innerHTML;
-        button.innerHTML = '<span style="color: #721c24;">❌</span>';
-        button.style.background = '#f8d7da';
-        
-        // Reset after 2 seconds
-        setTimeout(() => {
-          button.innerHTML = originalHTML;
-          button.style.background = '';
-        }, 2000);
+        // Fallback: try plain text copy
+        try {
+          const messageDiv = button.closest('.message.bot');
+          const contentDiv = messageDiv.querySelector('.message-content');
+          await navigator.clipboard.writeText(contentDiv.innerText || contentDiv.textContent || '');
+          
+          // Show success feedback
+          const originalHTML = button.innerHTML;
+          button.innerHTML = '<span style="color: #10a37f;">✓</span>';
+          button.classList.add('copied');
+          
+          setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copied');
+          }, 2000);
+        } catch (fallbackErr) {
+          console.error('Fallback copy also failed: ', fallbackErr);
+          
+          // Show error feedback
+          const originalHTML = button.innerHTML;
+          button.innerHTML = '<span style="color: #721c24;">❌</span>';
+          button.style.background = '#f8d7da';
+          
+          // Reset after 2 seconds
+          setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.style.background = '';
+          }, 2000);
+        }
       }
     }
 

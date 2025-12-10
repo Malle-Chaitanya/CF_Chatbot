@@ -1,6 +1,6 @@
 # query_expander.py
 from typing import List
-from langchain_openai import ChatOpenAI
+from app.llm_factory import get_llm
 
 class QueryExpander:
     """
@@ -10,11 +10,12 @@ class QueryExpander:
     alternative phrasings and synonyms for the user's query.
     """
     
-    def __init__(self, model_name: str = "gpt-4o-mini"):
-        self.llm = ChatOpenAI(
-            model_name=model_name, 
-            temperature=0.3,
-            request_timeout=10  # 10 second timeout to avoid hanging
+    def __init__(self, model_name: str = None):
+        # Use factory function to get appropriate LLM based on configuration
+        # model_name parameter is ignored when using factory function
+        self.llm = get_llm(
+            model_name=model_name,
+            temperature=0.3
         )
 
     def expand(self, query: str, n: int = 3) -> List[str]:

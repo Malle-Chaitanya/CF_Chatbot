@@ -97,6 +97,13 @@ class MongoDBMemoryManager:
             await sessions_collection.create_index("created_at")
             await sessions_collection.create_index([("created_at", -1)])
             
+            # Create indexes for shared chats collection
+            shared_chats_collection = self.database["shared_chats"]
+            await shared_chats_collection.create_index("share_token", unique=True)
+            await shared_chats_collection.create_index("session_id")
+            await shared_chats_collection.create_index("user_email")
+            await shared_chats_collection.create_index("created_at")
+            
             logger.info("MongoDB indexes created successfully")
         except Exception as e:
             logger.warning(f"Could not create indexes: {e}")
@@ -249,7 +256,7 @@ class MongoDBMemoryManager:
             return {"error": str(e)}
     
     async def save_session(self, session_data: Dict):
-        """Save or update a chat session."""
+        """Save or update a chat session with messages."""
         await self.connect()
         
         try:
@@ -266,6 +273,10 @@ class MongoDBMemoryManager:
                 "updated_at": datetime.fromtimestamp(session_data.get("updated_at", session_data["created_at"]) / 1000),
                 "message_count": session_data.get("message_count", 0)
             }
+            
+            # Include messages if provided
+            if "messages" in session_data:
+                session_doc["messages"] = session_data["messages"]
             
             # Upsert session
             await sessions_collection.update_one(
@@ -309,25 +320,31 @@ class MongoDBMemoryManager:
             logger.error(f"Error getting all sessions: {e}")
             return []
     
-    async def get_user_sessions(self, user_id: str, limit: int = 50) -> List[Dict]:
+    async def get_user_sessions(self, user_id: str, limit: int = 50, include_messages: bool = False) -> List[Dict]:
         """Get sessions for a specific user."""
         await self.connect()
         
         try:
             sessions_collection = self.database["chat_sessions"]
             
-            cursor = sessions_collection.find({"user_id": user_id}).sort("created_at", -1).limit(limit)
+            cursor = sessions_collection.find({"user_id": user_id}).sort("updated_at", -1).limit(limit)
             sessions = []
             
             async for doc in cursor:
-                sessions.append({
+                session = {
                     "session_id": doc["session_id"],
                     "user_id": doc["user_id"],
                     "title": doc["title"],
                     "created_at": int(doc["created_at"].timestamp() * 1000),
                     "updated_at": int(doc["updated_at"].timestamp() * 1000),
                     "message_count": doc.get("message_count", 0)
-                })
+                }
+                
+                # Include messages if requested
+                if include_messages and "messages" in doc:
+                    session["messages"] = doc["messages"]
+                
+                sessions.append(session)
             
             return sessions
             
@@ -335,7 +352,7 @@ class MongoDBMemoryManager:
             logger.error(f"Error getting user sessions: {e}")
             return []
     
-    async def get_session_by_id(self, session_id: str) -> Optional[Dict]:
+    async def get_session_by_id(self, session_id: str, include_messages: bool = False) -> Optional[Dict]:
         """Get a specific session by ID."""
         await self.connect()
         
@@ -344,7 +361,7 @@ class MongoDBMemoryManager:
             doc = await sessions_collection.find_one({"session_id": session_id})
             
             if doc:
-                return {
+                session = {
                     "session_id": doc["session_id"],
                     "user_id": doc["user_id"],
                     "user_email": doc.get("user_email", ""),
@@ -354,11 +371,75 @@ class MongoDBMemoryManager:
                     "updated_at": int(doc["updated_at"].timestamp() * 1000),
                     "message_count": doc.get("message_count", 0)
                 }
+                
+                # Include messages if requested
+                if include_messages and "messages" in doc:
+                    session["messages"] = doc["messages"]
+                
+                return session
             
             return None
             
         except Exception as e:
             logger.error(f"Error getting session {session_id}: {e}")
+            return None
+    
+    async def create_shared_chat(self, session_id: str, user_email: str, share_token: str) -> Dict:
+        """Create a shareable link for a chat session."""
+        await self.connect()
+        
+        try:
+            shared_chats_collection = self.database["shared_chats"]
+            
+            # Create shared chat document
+            shared_chat_doc = {
+                "share_token": share_token,
+                "session_id": session_id,
+                "user_email": user_email,
+                "created_at": datetime.utcnow(),
+                "expires_at": None  # No expiration for now
+            }
+            
+            # Insert into database
+            await shared_chats_collection.insert_one(shared_chat_doc)
+            
+            logger.info(f"Created shared chat token for session {session_id}")
+            return shared_chat_doc
+            
+        except DuplicateKeyError:
+            # Token already exists, return existing
+            doc = await shared_chats_collection.find_one({"share_token": share_token})
+            return doc
+        except Exception as e:
+            logger.error(f"Error creating shared chat: {e}")
+            raise e
+    
+    async def get_shared_chat(self, share_token: str) -> Optional[Dict]:
+        """Get shared chat information by token."""
+        await self.connect()
+        
+        try:
+            shared_chats_collection = self.database["shared_chats"]
+            doc = await shared_chats_collection.find_one({"share_token": share_token})
+            
+            if doc:
+                # Check if expired (if expiration is set)
+                if doc.get("expires_at") and doc["expires_at"] < datetime.utcnow():
+                    logger.info(f"Shared chat token {share_token} has expired")
+                    return None
+                
+                return {
+                    "share_token": doc["share_token"],
+                    "session_id": doc["session_id"],
+                    "user_email": doc["user_email"],
+                    "created_at": doc["created_at"],
+                    "expires_at": doc.get("expires_at")
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting shared chat {share_token}: {e}")
             return None
 
 # Global instance
@@ -407,10 +488,18 @@ async def get_all_sessions(limit: int = 30) -> List[Dict]:
     """Get recent sessions from all users."""
     return await mongodb_memory.get_all_sessions(limit)
 
-async def get_user_sessions(user_id: str, limit: int = 50) -> List[Dict]:
+async def get_user_sessions(user_id: str, limit: int = 50, include_messages: bool = False) -> List[Dict]:
     """Get sessions for a specific user."""
-    return await mongodb_memory.get_user_sessions(user_id, limit)
+    return await mongodb_memory.get_user_sessions(user_id, limit, include_messages)
 
-async def get_session_by_id(session_id: str) -> Optional[Dict]:
+async def get_session_by_id(session_id: str, include_messages: bool = False) -> Optional[Dict]:
     """Get a specific session by ID."""
-    return await mongodb_memory.get_session_by_id(session_id)
+    return await mongodb_memory.get_session_by_id(session_id, include_messages)
+
+async def create_shared_chat(session_id: str, user_email: str, share_token: str) -> Dict:
+    """Create a shareable link for a chat session."""
+    return await mongodb_memory.create_shared_chat(session_id, user_email, share_token)
+
+async def get_shared_chat(share_token: str) -> Optional[Dict]:
+    """Get shared chat information by token."""
+    return await mongodb_memory.get_shared_chat(share_token)
