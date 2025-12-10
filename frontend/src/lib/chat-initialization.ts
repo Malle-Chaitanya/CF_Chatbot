@@ -2,6 +2,7 @@
 'use client';
 
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+import type { ChatSession } from '@/types/chat';
 
 // Character limit constants
 const MAX_PROMPT_LENGTH = 20000; // ~5K tokens (safe for RAG)
@@ -10,6 +11,7 @@ const WARN_PROMPT_LENGTH = 10000; // ~2.5K tokens - warning threshold
 interface InitOptions {
   router?: AppRouterInstance;
   initialSessionId?: string | null;
+  preloadedSession?: ChatSession;
 }
 
 // Module-level state to track initialization
@@ -18,7 +20,7 @@ let currentInitializedSessionId: string | null = null;
 let currentRouter: AppRouterInstance | undefined = undefined;
 
 export function initializeChatApp(options: InitOptions = {}) {
-  const { router, initialSessionId } = options;
+  const { router, initialSessionId, preloadedSession } = options;
   
   // Guard: If already initialized with the same session, skip
   if (isAppInitialized && currentInitializedSessionId === initialSessionId) {
@@ -189,7 +191,7 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
   
   // Track the currently active session (for UI highlighting)
-  let activeSessionId = sessionId;
+  let activeSessionId: string | null = sessionId;
   
   // Track if this is a brand new session that needs URL navigation after first message
   let isNewSessionPendingNavigation = !initialSessionId && sessionId;
@@ -523,7 +525,9 @@ export function initializeChatApp(options: InitOptions = {}) {
       const user = JSON.parse(localStorage.getItem('user') || 'null');
       if (!user || !user.access_token) return;
       
-      await fetch(`${getApiBase()}/chat/sessions/save`, {
+      console.log('[SESSION SYNC] Syncing to backend with', sessionData.messages.length, 'messages');
+      
+      const response = await fetch(`${getApiBase()}/chat/sessions/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -534,9 +538,16 @@ export function initializeChatApp(options: InitOptions = {}) {
           title: sessionData.title,
           created_at: sessionData.createdAt,
           updated_at: sessionData.timestamp,
+          messages: sessionData.messages,  // ✅ Include messages array
           message_count: sessionData.messages.length
         })
       });
+      
+      if (response.ok) {
+        console.log('[SESSION SYNC] Successfully synced to backend');
+      } else {
+        console.error('[SESSION SYNC] Failed with status:', response.status);
+      }
     } catch (error) {
       console.error('[SESSION] Failed to sync session to backend:', error);
     }
@@ -896,7 +907,8 @@ export function initializeChatApp(options: InitOptions = {}) {
       </button>
     ` : '';
     
-    const shareButton = `
+    // Share button is only for own chats (not read-only/others' chats)
+    const shareButton = !isReadOnly ? `
       <button class="header-btn share-button" onclick="window.shareChat()" title="Share this chat">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="18" cy="5" r="3"></circle>
@@ -907,7 +919,7 @@ export function initializeChatApp(options: InitOptions = {}) {
         </svg>
         <span>Share</span>
       </button>
-    `;
+    ` : '';
     
     headerContainer.innerHTML = `
       <div class="chat-header">
@@ -1541,7 +1553,7 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
 
   // Toast notification function
-  function showToast(message: string) {
+  function showToast(message: string, type: string = 'info', duration: number = 2000) {
     // Remove existing toast if any
     const existingToast = document.querySelector('.toast-notification');
     if (existingToast) {
@@ -1550,7 +1562,7 @@ export function initializeChatApp(options: InitOptions = {}) {
     
     // Create toast element
     const toast = document.createElement('div');
-    toast.className = 'toast-notification';
+    toast.className = `toast-notification toast-${type}`;
     toast.textContent = message;
     document.body.appendChild(toast);
     
@@ -1559,13 +1571,13 @@ export function initializeChatApp(options: InitOptions = {}) {
       toast.classList.add('show');
     }, 10);
     
-    // Remove after 2 seconds
+    // Remove after specified duration
     setTimeout(() => {
       toast.classList.remove('show');
       setTimeout(() => {
         toast.remove();
       }, 300);
-    }, 2000);
+    }, duration);
   }
 
   function addMessage(content: string, sender: string) {
@@ -2666,14 +2678,21 @@ export function initializeChatApp(options: InitOptions = {}) {
           console.log('[SESSION] Loading Others Chat from backend:', initialSessionId);
           loadOthersSession(initialSessionId);
         } else {
-          // This is user's own chat - load from localStorage
-          const sessions = getAllSessions();
-          const currentSession = sessions.find(s => s.id === sessionId);
-          if (currentSession && messagesDiv!.children.length === 0) {
-            console.log('[SESSION] Loading existing session from localStorage');
-            loadSession(currentSession);
-          } else if (!currentSession) {
-            console.log('[SESSION] Session not found in localStorage:', sessionId);
+          // This is user's own chat
+          // Use preloaded session if available (from shared chat or session page)
+          if (preloadedSession && preloadedSession.messages && preloadedSession.messages.length > 0) {
+            console.log('[SESSION] Loading preloaded session with', preloadedSession.messages.length, 'messages');
+            loadSession(preloadedSession);
+          } else {
+            // Fall back to localStorage
+            const sessions = getAllSessions();
+            const currentSession = sessions.find(s => s.id === sessionId);
+            if (currentSession && messagesDiv!.children.length === 0) {
+              console.log('[SESSION] Loading existing session from localStorage');
+              loadSession(currentSession);
+            } else if (!currentSession) {
+              console.log('[SESSION] Session not found in localStorage or preloaded');
+            }
           }
         }
       } else {

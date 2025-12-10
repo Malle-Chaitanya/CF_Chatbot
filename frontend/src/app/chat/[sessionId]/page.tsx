@@ -26,6 +26,7 @@ export default function ChatSessionPage() {
   // This prevents hydration mismatches
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
@@ -134,7 +135,12 @@ export default function ChatSessionPage() {
 
   // Load session data after authentication
   useEffect(() => {
-    if (!isAuthenticated || !sessionId) return;
+    if (!isAuthenticated || !sessionId) {
+      setIsLoadingSession(false);
+      return;
+    }
+
+    setIsLoadingSession(true);
 
     const loadSession = async () => {
       console.log('[SESSION] Loading own session from [sessionId] route:', sessionId);
@@ -143,30 +149,117 @@ export default function ChatSessionPage() {
       // If user_chat_ format appears here, redirect to correct route
       if (sessionId.startsWith('user_chat_')) {
         console.log('[SESSION] Others chat detected, redirecting to /chat/others/', sessionId);
+        setIsLoadingSession(false);
         router.replace(`/chat/others/${sessionId}`);
         return;
       }
       
-      // Load own session
-      const session = getSessionById(sessionId);
+      // Try to load own session from localStorage first
+      let session = getSessionById(sessionId);
+      
       if (session) {
-        console.log('[SESSION] Loaded own session:', session.title);
+        console.log('[SESSION] Loaded own session from localStorage:', session.title);
         setCurrentSession(session);
         setCurrentSessionId(sessionId);
         setIsReadOnly(false);
+        setIsLoadingSession(false);
       } else {
-        console.log('[SESSION] Session not found in localStorage:', sessionId);
-        console.log('[SESSION] Redirecting to new chat');
-        router.push('/chat/new');
+        // Session not in localStorage - might be a recently shared chat that was just created
+        // Try to fetch from backend
+        console.log('[SESSION] Session not found in localStorage, trying backend:', sessionId);
+        try {
+          const user = getCurrentUser();
+          if (!user || !user.access_token) {
+            throw new Error('Not authenticated');
+          }
+          
+          // Determine API base URL
+          const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+          let apiBase = '';
+          
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
+          } else if (hostname === 'ai.cloudfuze.com') {
+            apiBase = 'https://ai.cloudfuze.com';
+          } else {
+            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+            apiBase = origin.startsWith('http://') && hostname !== 'localhost' && hostname !== '127.0.0.1'
+              ? origin.replace('http://', 'https://')
+              : origin;
+          }
+          
+          const response = await fetch(`${apiBase}/chat/sessions/${sessionId}?include_messages=true`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${user.access_token}`
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('[SESSION] Loaded session from backend:', data);
+            
+            if (!data || !data.session_id) {
+              console.error('[SESSION] Backend response missing session_id:', data);
+              router.push('/chat/new');
+              return;
+            }
+            
+            // Store in localStorage for future access
+            const sessionToStore = {
+              id: data.session_id,
+              title: data.title || '',
+              timestamp: data.updated_at || Date.now(),
+              createdAt: data.created_at || Date.now(),
+              messages: data.messages || []
+            };
+            
+            console.log('[SESSION] Storing session in localStorage:', sessionToStore);
+            
+            try {
+              // Use the same storage key format as session-utils.ts
+              const storageKeyBase = 'chat_sessions';
+              const userId = user?.id || 'anonymous';
+              const storageKey = `${storageKeyBase}_${userId}`;
+              
+              // Get existing sessions and add/update this one
+              const existingSessions = JSON.parse(localStorage.getItem(storageKey) || '[]');
+              const updatedSessions = [
+                sessionToStore,
+                ...existingSessions.filter((s: any) => s.id !== data.session_id)
+              ];
+              
+              localStorage.setItem(storageKey, JSON.stringify(updatedSessions));
+              console.log('[SESSION] Stored in localStorage with key:', storageKey);
+            } catch (e) {
+              console.warn('[SESSION] Failed to store in localStorage:', e);
+            }
+            
+            setCurrentSession(sessionToStore);
+            setCurrentSessionId(sessionId);
+            setIsReadOnly(false);
+            setIsLoadingSession(false);
+          } else {
+            const errorText = await response.text();
+            console.log('[SESSION] Session not found on backend:', response.status, errorText);
+            setIsLoadingSession(false);
+            router.push('/chat/new');
+          }
+        } catch (error) {
+          console.error('[SESSION] Error loading session from backend:', error);
+          setIsLoadingSession(false);
+          router.push('/chat/new');
+        }
       }
     };
 
     loadSession();
   }, [isAuthenticated, sessionId, router]);
 
-  // Initialize chat app ONLY after authentication (session load happens inside init)
+  // Initialize chat app ONLY after authentication AND session is loaded
   useEffect(() => {
-    if (isAuthenticated && sessionId) {
+    if (isAuthenticated && sessionId && currentSession) {
       // Wait for marked.js to load
       const checkMarked = setInterval(() => {
         if (typeof window.marked !== 'undefined') {
@@ -174,15 +267,20 @@ export default function ChatSessionPage() {
           // Import and initialize the chat app
           import('@/lib/chat-initialization').then(({ initializeChatApp }) => {
             console.log('[CHAT] Initializing chat with session:', sessionId);
-            // Pass router and the session ID from URL
-            initializeChatApp({ router, initialSessionId: sessionId });
+            console.log('[CHAT] Current session loaded with messages:', currentSession?.messages?.length || 0);
+            // Pass router, session ID, and the currently loaded session data
+            initializeChatApp({ 
+              router, 
+              initialSessionId: sessionId,
+              preloadedSession: currentSession
+            });
           });
         }
       }, 100);
 
       return () => clearInterval(checkMarked);
     }
-  }, [isAuthenticated, sessionId, router]);
+  }, [isAuthenticated, sessionId, router, currentSession]);
 
   const handleNewChat = () => {
     router.push('/chat/new');
@@ -234,6 +332,43 @@ export default function ChatSessionPage() {
 
   if (!isAuthenticated) {
     return null;
+  }
+
+  // Show loading state while session is being fetched from backend
+  if (isLoadingSession) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'white',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <div style={{
+          width: '50px',
+          height: '50px',
+          border: '4px solid #f3f3f3',
+          borderTop: '4px solid #0129ac',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }}></div>
+        <p style={{ 
+          marginTop: '20px', 
+          color: '#666',
+          fontSize: '16px'
+        }}>
+          Loading chat session...
+        </p>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
   }
 
   return (

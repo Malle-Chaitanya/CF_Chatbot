@@ -48,12 +48,12 @@ export default function ChatHeader({
             </button>
           )}
 
-          {/* Share button - available for both own and others' chats */}
-          {onShare && (
+          {/* Share button - only for own chats (not for read-only/others' chats) */}
+          {onShare && !isReadOnly && (
             <button 
               className="header-btn share-button" 
               onClick={onShare}
-              title={isReadOnly ? "Share this chat with others" : "Share this chat"}
+              title="Share this chat"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="18" cy="5" r="3"></circle>

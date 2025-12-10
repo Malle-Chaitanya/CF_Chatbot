@@ -64,10 +64,12 @@ export default function SharedChatPage() {
 
         console.log('[AUTH] User authenticated successfully:', user.email);
         setIsAuthenticated(true);
+        setIsLoading(false);
         
       } catch (error) {
         console.error('[AUTH] Authentication check failed:', error);
         localStorage.removeItem('user');
+        setIsLoading(false);
         router.replace('/login?error=verification_failed');
       } finally {
         authCheckRef.current = false;
@@ -79,7 +81,11 @@ export default function SharedChatPage() {
 
   // Load shared chat after authentication
   useEffect(() => {
-    if (!isAuthenticated || !shareToken) return;
+    console.log('[SHARED] Effect triggered - isAuthenticated:', isAuthenticated, 'shareToken:', shareToken);
+    if (!isAuthenticated || !shareToken) {
+      console.log('[SHARED] Skipping load - auth or token not ready');
+      return;
+    }
 
     const loadSharedChat = async () => {
       try {
@@ -115,10 +121,14 @@ export default function SharedChatPage() {
         });
 
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[SHARED] API error response:', response.status, errorText);
           if (response.status === 404) {
             setError('Shared chat not found or has expired');
+          } else if (response.status === 403) {
+            setError('You do not have permission to access this shared chat');
           } else {
-            setError('Failed to load shared chat');
+            setError(`Failed to load shared chat (${response.status})`);
           }
           setIsLoading(false);
           return;
@@ -127,6 +137,42 @@ export default function SharedChatPage() {
         const data = await response.json();
         
         console.log('[SHARED] Chat copied successfully:', data.session_id);
+        console.log('[SHARED] Messages in response:', data.messages?.length || 0);
+        console.log('[SHARED] Full response:', data);
+        
+        // CRITICAL: Store session in localStorage BEFORE redirecting
+        // This ensures the session is immediately available when the chat page loads
+        try {
+          const user = getCurrentUser();
+          if (user && user.id && data.messages) {
+            const storageKeyBase = 'chat_sessions';
+            const storageKey = `${storageKeyBase}_${user.id}`;
+            
+            const sessionToStore = {
+              id: data.session_id,
+              title: data.title || 'Shared Chat',
+              timestamp: data.updated_at || Date.now(),
+              createdAt: data.created_at || Date.now(),
+              messages: data.messages || []
+            };
+            
+            // Get existing sessions and prepend this new one
+            const existingSessions = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            const updatedSessions = [
+              sessionToStore,
+              ...existingSessions.filter((s: any) => s.id !== data.session_id)
+            ];
+            
+            localStorage.setItem(storageKey, JSON.stringify(updatedSessions));
+            console.log('[SHARED] Stored session in localStorage before redirect:', sessionToStore.id);
+            console.log('[SHARED] Stored messages count:', sessionToStore.messages.length);
+          }
+        } catch (e) {
+          console.warn('[SHARED] Failed to store session in localStorage:', e);
+          // Continue with redirect even if storage fails - backend fallback will handle it
+        }
+        
+        console.log('[SHARED] Redirecting to /chat/', data.session_id);
         
         // Redirect to the new session in user's own chats
         router.replace(`/chat/${data.session_id}`);

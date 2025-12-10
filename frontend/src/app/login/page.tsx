@@ -334,8 +334,15 @@ function initializeLoginPage() {
         localStorage.setItem('user', JSON.stringify(user));
         // Clear URL parameters before redirecting
         window.history.replaceState({}, document.title, window.location.pathname);
-        // Redirect to main page
-        window.location.href = "/";
+        
+        // Get redirect URL from query params, default to home
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectUrl = urlParams.get('redirect') || '/';
+        
+        console.log('[AUTH] Login successful, redirecting to:', redirectUrl);
+        
+        // Redirect to the intended page
+        window.location.href = redirectUrl;
       } else {
         const errorText = await response.text();
         console.log('Server error response:', errorText);
