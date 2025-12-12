@@ -3,6 +3,7 @@
 
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import type { ChatSession } from '@/types/chat';
+import { fetchAndMergeUserSessions } from '@/lib/session-utils';
 
 // Character limit constants
 const MAX_PROMPT_LENGTH = 20000; // ~5K tokens (safe for RAG)
@@ -524,8 +525,11 @@ export function initializeChatApp(options: InitOptions = {}) {
     
     saveAllSessions(sessions);
     
-    // Render session history (async)
-    renderSessionHistory().catch(err => console.error('[SESSION] Failed to render history:', err));
+    // Delay renderSessionHistory to allow immediate sidebar update to complete first
+    // This ensures the sidebar shows the new chat immediately before the full re-render
+    setTimeout(() => {
+      renderSessionHistory().catch(err => console.error('[SESSION] Failed to render history:', err));
+    }, 100);
     
     // Sync session metadata to backend
     syncSessionToBackend(sessionData);
@@ -1218,6 +1222,129 @@ export function initializeChatApp(options: InitOptions = {}) {
     
     // Update activeSessionId for future reference
     activeSessionId = newActiveSessionId;
+  }
+  
+  // Update sidebar immediately when a new message is sent (before response)
+  function updateSidebarImmediately() {
+    if (!sessionId) return;
+    
+    const sidebarHistory = document.getElementById('sidebar-history');
+    if (!sidebarHistory) return;
+    
+    // Check if this session already exists in the sidebar
+    const existingItem = sidebarHistory.querySelector(`[data-session-id="${sessionId}"]`);
+    if (existingItem) {
+      // Session already exists, just update active state
+      updateSidebarActiveState(sessionId);
+      return;
+    }
+    
+    // Get title from the first user message in DOM (most reliable source)
+    let sessionTitle = 'New Chat';
+    const firstUserMessage = messagesDiv!.querySelector('.message.user');
+    if (firstUserMessage) {
+      const messageText = firstUserMessage.textContent || '';
+      sessionTitle = messageText.substring(0, 50) + (messageText.length > 50 ? '...' : '');
+    }
+    
+      // Find or create "Today" section - optimize DOM queries
+      let todaySection = sidebarHistory.querySelector('.history-section-content[data-section-id="today"]') as HTMLElement;
+      
+      if (!todaySection) {
+        // Remove "no-history" message if exists
+        const noHistory = sidebarHistory.querySelector('.no-history');
+        if (noHistory) noHistory.remove();
+        
+        // Check if section title exists
+        const sectionTitleExists = sidebarHistory.querySelector('.history-section-title[data-section-id="today"]');
+        
+        // Create Today section content
+        todaySection = document.createElement('div');
+        todaySection.className = 'history-section-content';
+        todaySection.setAttribute('data-section-id', 'today');
+        
+        if (!sectionTitleExists) {
+          // Create section title
+          const sectionTitle = document.createElement('div');
+          sectionTitle.className = 'history-section-title';
+          sectionTitle.setAttribute('data-section-id', 'today');
+          sectionTitle.innerHTML = `
+            <span>Today</span>
+            <button class="section-toggle-btn" data-section-id="today" title="Collapse">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="toggle-icon">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          `;
+          sidebarHistory.appendChild(sectionTitle);
+        }
+        
+        // Insert content after title
+        const sectionTitle = sidebarHistory.querySelector('.history-section-title[data-section-id="today"]');
+        if (sectionTitle) {
+          sidebarHistory.insertBefore(todaySection, sectionTitle.nextSibling);
+        } else {
+          sidebarHistory.appendChild(todaySection);
+        }
+      }
+      
+      if (todaySection) {
+        // Create new history item with minimal HTML for faster rendering
+        const historyItem = document.createElement('div');
+        historyItem.className = 'history-item active';
+        historyItem.setAttribute('data-session-id', sessionId);
+        historyItem.style.transition = 'none'; // Disable transition for instant appearance
+        historyItem.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span class="history-item-title">${sessionTitle}</span>
+          <button class="history-item-menu" data-session-id="${sessionId}" title="Delete chat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+          </button>
+        `;
+        
+        // Insert at the beginning of Today section
+        todaySection.insertBefore(historyItem, todaySection.firstChild);
+        
+        // Remove active class from all other items (optimize query)
+        const allItems = sidebarHistory.querySelectorAll('.history-item');
+        for (let i = 0; i < allItems.length; i++) {
+          const item = allItems[i] as HTMLElement;
+          if (item.getAttribute('data-session-id') !== sessionId) {
+            item.classList.remove('active');
+          }
+        }
+        
+        // Re-enable transition after a brief moment for smooth interactions
+        setTimeout(() => {
+          historyItem.style.transition = '';
+        }, 10);
+        
+        // Add click handler
+        historyItem.addEventListener('click', (e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('.history-item-menu') || target.closest('.history-item-dropdown')) return;
+          
+          if (router) {
+            router.push(`/chat/${sessionId}`);
+          } else {
+            const allSessions = getAllSessions();
+            const session = allSessions.find(s => s.id === sessionId);
+            if (session) {
+              loadSession(session, false);
+            }
+          }
+        });
+        
+        // Update activeSessionId
+        activeSessionId = sessionId;
+      }
   }
   
   // Render session history in sidebar
@@ -1913,7 +2040,11 @@ export function initializeChatApp(options: InitOptions = {}) {
     const counter = document.getElementById('char-counter');
     if (counter) counter.style.display = 'none';
     
-    // Save session after user message
+    // Update sidebar IMMEDIATELY before saving (for instant visual feedback)
+    // This shows the new chat in sidebar right away
+    updateSidebarImmediately();
+    
+    // Save session after user message (saves to localStorage synchronously)
     saveCurrentSession();
     
     await sendMessageText(question);
@@ -3067,7 +3198,7 @@ export function initializeChatApp(options: InitOptions = {}) {
   // ============================================================================
   
   // Initialize auth - simplified since auth check is done at component level
-  function initAuth() {
+  async function initAuth() {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     
     // User is already authenticated at this point (checked in component)
@@ -3135,10 +3266,21 @@ export function initializeChatApp(options: InitOptions = {}) {
       // Remove any existing test sessions (production cleanup)
       removeTestSessions();
       
+      // ✅ IMPORTANT: Fetch and merge sessions from backend BEFORE rendering sidebar
+      // This ensures chats saved on other devices/browsers are available
+      console.log('[SESSIONS] Fetching sessions from backend for cross-device sync...');
+      try {
+        await fetchAndMergeUserSessions();
+        console.log('[SESSIONS] Backend sync complete');
+      } catch (error) {
+        console.error('[SESSIONS] Failed to fetch sessions from backend:', error);
+        // Continue even if backend fetch fails (use local sessions)
+      }
+      
       // Load dynamic suggested questions (only on first initialization)
       loadSuggestedQuestions();
       
-      // Load session history in sidebar (async)
+      // Load session history in sidebar (async) - now includes backend sessions
       renderSessionHistory().catch(err => console.error('[SESSION] Failed to render history:', err));
       
       // Load current session if it exists in localStorage

@@ -21,8 +21,22 @@ export default function OthersSessionChatPage() {
   // This prevents hydration mismatches
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  // Load sidebar state from localStorage, default to true if not set
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebarOpen');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
   const authCheckRef = useRef<boolean>(false);
+
+  // Save sidebar state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebarOpen', String(isSidebarOpen));
+    }
+  }, [isSidebarOpen]);
 
   const verifyToken = useCallback(async (accessToken: string): Promise<boolean> => {
     try {

@@ -1369,10 +1369,12 @@ header img {
 .chatgpt-sidebar.closed .new-chat-btn-sidebar {
   width: 40px;
   height: 40px;
-  padding: 10px;
+  padding: 0;
   justify-content: center;
+  align-items: center;
   border-radius: 8px;
   margin: 0 auto;
+  gap: 0;
 }
 
 .new-chat-btn-sidebar .btn-text {
@@ -1402,6 +1404,13 @@ header img {
 .new-chat-btn-sidebar svg {
   transition: all 0.2s ease;
   flex-shrink: 0;
+  display: block;
+}
+
+.chatgpt-sidebar.closed .new-chat-btn-sidebar svg {
+  margin: 0;
+  width: 20px;
+  height: 20px;
 }
 
 .new-chat-btn-sidebar:hover svg {
@@ -1655,6 +1664,12 @@ header img {
   visibility: visible !important;
 }
 
+/* Keep delete icon visible when delete confirmation is active */
+.history-item.delete-active .history-item-menu {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 /* Button hover effect */
 .history-item-menu:hover {
   background: rgba(0, 0, 0, 0.08) !important;
@@ -1899,6 +1914,11 @@ header img {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+/* Ensure header is below modal overlay when modal is open */
+.chatgpt-container.modal-open .chat-header {
+  z-index: 1;
+}
+
 .chat-header-content {
   max-width: 800px;
   margin: 0 auto;
@@ -2114,6 +2134,178 @@ header img {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   border: 1px solid #d1d5db;
   z-index: 1001;
+}
+
+/* ============================================================================
+   LOGOUT CONFIRMATION MODAL
+   ============================================================================ */
+
+.logout-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeInOverlay 0.15s ease-out forwards;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+}
+
+/* Disable interactions with background when modal is open */
+.chatgpt-container.modal-open {
+  pointer-events: none;
+}
+
+.chatgpt-container.modal-open .chatgpt-main,
+.chatgpt-container.modal-open .chatgpt-sidebar,
+.chatgpt-container.modal-open .chat-header,
+.chatgpt-container.modal-open #chat-header-container,
+.chatgpt-container.modal-open .chat-header-content,
+.chatgpt-container.modal-open .header-actions,
+.chatgpt-container.modal-open .header-btn {
+  pointer-events: none !important;
+  user-select: none;
+  cursor: default;
+}
+
+/* Ensure header is below modal overlay when modal is open and gets blurred */
+.chatgpt-container.modal-open .chat-header,
+.chatgpt-container.modal-open #chat-header-container {
+  z-index: 1 !important;
+  position: relative;
+}
+
+.logout-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  z-index: 10003;
+  animation: slideUpModal 0.15s ease-out forwards;
+  overflow: hidden;
+  cursor: default;
+  will-change: transform, opacity;
+  pointer-events: auto;
+  opacity: 0;
+}
+
+@keyframes slideUpModal {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.logout-modal-content {
+  padding: 24px;
+}
+
+.logout-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.logout-modal-message {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.logout-modal-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.logout-modal-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  font-family: inherit;
+  min-width: 80px;
+  position: relative;
+  overflow: hidden;
+  outline: none;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.logout-confirm-btn {
+  background: #0078d4;
+  color: white;
+}
+
+.logout-confirm-btn:hover {
+  background: #106ebe;
+}
+
+.logout-confirm-btn:active {
+  background: #005a9e;
+}
+
+.logout-confirm-btn:focus-visible {
+  outline: 2px solid #0078d4;
+  outline-offset: 2px;
+}
+
+.logout-cancel-btn {
+  background: white;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+}
+
+.logout-cancel-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.logout-cancel-btn:active {
+  background: #f3f4f6;
+}
+
+.logout-cancel-btn:focus-visible {
+  outline: 2px solid #9ca3af;
+  outline-offset: 2px;
 }
 
 /* ============================================================================

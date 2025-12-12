@@ -11,11 +11,25 @@ export default function ChatsPage() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  // Load sidebar state from localStorage, default to true if not set
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebarOpen');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<ChatSession[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const authCheckRef = useRef<boolean>(false);
+
+  // Save sidebar state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebarOpen', String(isSidebarOpen));
+    }
+  }, [isSidebarOpen]);
 
   // Verify token with Microsoft Graph API
   const verifyTokenCallback = useCallback(async (accessToken: string): Promise<boolean> => {
