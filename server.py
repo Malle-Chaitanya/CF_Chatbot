@@ -133,7 +133,9 @@ app.include_router(questions_router)
 
 # Mount static directories for images and other assets
 app.mount("/images", StaticFiles(directory="images"), name="images")
-app.mount("/data", StaticFiles(directory="data"), name="data")
+# Only mount /data if the directory exists
+if os.path.exists("data"):
+    app.mount("/data", StaticFiles(directory="data"), name="data")
 
 # Serve HTML files
 @app.get("/login.html")

@@ -245,10 +245,16 @@ export function initializeChatApp(options: InitOptions = {}) {
   function removeTestSessions() {
     try {
       const sessions = getAllSessions();
-      const cleanedSessions = sessions.filter(session => 
-        !session.id.startsWith('test-') && 
-        !session.title.toLowerCase().includes('test chat')
-      );
+      const cleanedSessions = sessions.filter(session => {
+        // Skip sessions with null/undefined id or title
+        if (!session?.id || !session?.title) {
+          return false; // Remove invalid sessions
+        }
+        return (
+          !session.id.startsWith('test-') && 
+          !session.title.toLowerCase().includes('test chat')
+        );
+      });
       
       if (sessions.length !== cleanedSessions.length) {
         console.log('[CLEANUP] Removed', sessions.length - cleanedSessions.length, 'test sessions');

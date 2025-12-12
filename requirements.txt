@@ -57,6 +57,7 @@ pymongo==4.5.0
 unstructured[all-docs]==0.11.8
 
 # Machine Learning
+numpy<2.0  # Required for onnxruntime compatibility (unstructured library dependency)
 scikit-learn>=1.4.0
 tiktoken>=0.7.0,<1.0.0
 
