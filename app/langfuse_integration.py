@@ -45,6 +45,8 @@ class LangfuseTracker:
     ) -> Optional[str]:
         """Create a simple chat trace (for non-RAG queries)."""
         if not self.client:
+            print("[WARNING] Langfuse client not initialized - cannot create trace")
+            print("[WARNING] Check LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_HOST in config")
             return None
         
         try:
@@ -69,10 +71,14 @@ class LangfuseTracker:
                 metadata={"timestamp": datetime.now().isoformat()}
             )
             
-            return trace.id
+            trace_id = trace.id
+            print(f"[LANGFUSE] ✓ Created trace: {trace_id}")
+            return trace_id
             
         except Exception as e:
-            print(f"[ERROR] Langfuse trace failed: {e}")
+            print(f"[ERROR] Langfuse trace creation failed: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def add_feedback(self, trace_id: str, rating: str, comment: Optional[str] = None) -> bool:
@@ -81,14 +87,29 @@ class LangfuseTracker:
             print("[WARNING] Langfuse client not initialized - feedback not logged")
             return False
         
+        # ✅ STRICT VALIDATION: Reject fallback IDs (they don't exist in Langfuse)
+        if trace_id.startswith('feedback_fallback_'):
+            print(f"[ERROR] Rejected fallback trace_id: {trace_id}")
+            print(f"[ERROR] Fallback trace_ids don't exist in Langfuse - feedback cannot be attached")
+            raise ValueError(f"Invalid trace_id: {trace_id}. Fallback trace_ids are not allowed.")
+        
         try:
             print(f"[LANGFUSE] Submitting feedback - trace_id: {trace_id}, rating: {rating}, comment: {comment or '(none)'}")
-            self.client.score(
-                trace_id=trace_id,
-                name="user_rating",
-                value=1 if rating == "thumbs_up" else 0,
+            
+            # Get the trace first, then add score to it
+            # This ensures the score is properly attached to the trace
+            trace = self.client.trace(id=trace_id)
+            
+            # Use score() method with clear value mapping
+            # thumbs_up = 1, thumbs_down = 0 (per latest UX request)
+            score_value = 1 if rating == "thumbs_up" else 0
+            
+            trace.score(
+                name="user_feedback",
+                value=score_value,
                 comment=comment or ""
             )
+            
             print(f"[LANGFUSE] ✓ Feedback submitted successfully to trace {trace_id}")
             return True
             
@@ -96,7 +117,7 @@ class LangfuseTracker:
             print(f"[ERROR] Langfuse feedback failed for trace {trace_id}: {e}")
             import traceback
             traceback.print_exc()
-            return False
+            raise  # Re-raise to let the endpoint handle it
     
     def log_observation_to_trace(
         self, 
@@ -135,6 +156,8 @@ class LangfuseTracker:
     ):
         """Create structured RAG pipeline trace with nested spans."""
         if not self.client:
+            print("[WARNING] Langfuse client not initialized - cannot create RAG trace")
+            print("[WARNING] Check LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_HOST in config")
             return None
         
         try:
@@ -149,10 +172,14 @@ class LangfuseTracker:
                 metadata=trace_metadata,
                 tags=["rag", "chat"]
             )
-            return RAGPipelineTrace(trace)
+            rag_trace = RAGPipelineTrace(trace)
+            print(f"[LANGFUSE] ✓ Created RAG trace: {rag_trace.trace_id}")
+            return rag_trace
             
         except Exception as e:
-            print(f"[ERROR] RAG trace failed: {e}")
+            print(f"[ERROR] RAG trace creation failed: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
 
@@ -269,9 +296,13 @@ class RAGPipelineTrace:
             if metadata:
                 self.trace.update(metadata=metadata)
             
+            print(f"[LANGFUSE] ✓ Completed RAG trace: {self.trace_id}")
             return self.trace_id
         except Exception as e:
             print(f"[ERROR] Trace completion failed: {e}")
+            import traceback
+            traceback.print_exc()
+            # Still return trace_id even if completion failed
             return self.trace_id
 
 

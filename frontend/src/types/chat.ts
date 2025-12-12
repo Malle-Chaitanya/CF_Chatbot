@@ -11,6 +11,9 @@ export interface User {
 export interface Message {
   role: string;
   content: string;
+  traceId?: string; // Persist Langfuse trace mapping for feedback after refresh
+  feedbackSubmitted?: boolean;
+  feedbackRating?: 'thumbs_up' | 'thumbs_down';
   recommendedQuestions?: string[];
 }
 

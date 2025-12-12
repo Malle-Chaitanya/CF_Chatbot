@@ -17,7 +17,6 @@ interface InitOptions {
 // Module-level state to track initialization
 let isAppInitialized = false;
 let currentInitializedSessionId: string | null = null;
-let currentRouter: AppRouterInstance | undefined = undefined;
 
 export function initializeChatApp(options: InitOptions = {}) {
   const { router, initialSessionId, preloadedSession } = options;
@@ -33,10 +32,6 @@ export function initializeChatApp(options: InitOptions = {}) {
   
   if (isSwitchingSession) {
     console.log('[CHAT] Switching session from', currentInitializedSessionId, 'to', initialSessionId);
-    // Update router reference
-    if (router) {
-      currentRouter = router;
-    }
   }
   
   // API Base URL configuration
@@ -153,7 +148,7 @@ export function initializeChatApp(options: InitOptions = {}) {
     title: string;
     timestamp: number;
     createdAt: number;
-    messages: Array<{role: string, content: string, recommendedQuestions?: string[]}>;
+    messages: Array<{role: string, content: string, traceId?: string, feedbackSubmitted?: boolean, feedbackRating?: 'thumbs_up' | 'thumbs_down', recommendedQuestions?: string[]}>;
     deletedAt?: number; // Timestamp when session was deleted (for soft delete)
   }
 
@@ -191,7 +186,7 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
   
   // Track the currently active session (for UI highlighting)
-  let activeSessionId: string | null = sessionId;
+  let activeSessionId: string | null = sessionId || null;
   
   // Track if this is a brand new session that needs URL navigation after first message
   let isNewSessionPendingNavigation = !initialSessionId && sessionId;
@@ -265,6 +260,15 @@ export function initializeChatApp(options: InitOptions = {}) {
       console.error('[CLEANUP] Failed to remove test sessions:', e);
       return false;
     }
+  }
+
+  // Utility: clear and reload suggested questions containers
+  function reloadSuggestedQuestions() {
+    const emptyContainer = document.getElementById('suggested-questions-empty');
+    const mainContainer = document.getElementById('suggested-questions-main');
+    if (emptyContainer) emptyContainer.innerHTML = '';
+    if (mainContainer) mainContainer.innerHTML = '';
+    loadSuggestedQuestions();
   }
   
   // Add test data for all time periods (for UI testing)
@@ -422,13 +426,9 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
   
   // Expose to window for easy access in console
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).removeTestSessions = removeTestSessions;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).viewDeletedSessions = viewDeletedSessions;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).clearDeletedSessions = clearDeletedSessions;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).viewUserData = viewUserData;
   
   // Save current session
@@ -448,6 +448,9 @@ export function initializeChatApp(options: InitOptions = {}) {
         // Bot message - capture content and recommended questions
         const messageContentDiv = child.querySelector('.message-content') as HTMLElement;
         const content = messageContentDiv?.innerHTML || '';
+        const traceId = (child as HTMLElement).dataset.traceId || undefined;
+        const feedbackSubmitted = (child as HTMLElement).dataset.feedbackSubmitted === 'true';
+        const feedbackRating = (child as HTMLElement).dataset.feedbackRating as ('thumbs_up' | 'thumbs_down' | undefined);
         const recommendedQuestionsDiv = child.querySelector('.recommended-questions');
         const recommendedQuestions: string[] = [];
         
@@ -468,6 +471,9 @@ export function initializeChatApp(options: InitOptions = {}) {
         const result = {
           role: 'assistant',
           content: content,
+          traceId,
+          feedbackSubmitted,
+          feedbackRating,
           recommendedQuestions: recommendedQuestions.length > 0 ? recommendedQuestions : undefined
         };
         
@@ -661,7 +667,7 @@ export function initializeChatApp(options: InitOptions = {}) {
       console.log('[CONTINUE] Starting continue in thread functionality');
       
       // Get current messages from the DOM
-      const messages: Array<{role: string, content: string, recommendedQuestions?: string[]}> = [];
+      const messages: Array<{role: string, content: string, traceId?: string, feedbackSubmitted?: boolean, feedbackRating?: 'thumbs_up' | 'thumbs_down', recommendedQuestions?: string[]}> = [];
       const messageElements = messagesDiv!.children;
       
       // Skip the read-only banner (first element)
@@ -687,6 +693,9 @@ export function initializeChatApp(options: InitOptions = {}) {
         else if (element.classList.contains('message') && element.classList.contains('bot')) {
           const messageContentDiv = element.querySelector('.message-content') as HTMLElement;
           const content = messageContentDiv?.innerHTML || messageContentDiv?.textContent || '';
+          const traceId = (element as HTMLElement).dataset.traceId || undefined;
+          const feedbackSubmitted = (element as HTMLElement).dataset.feedbackSubmitted === 'true';
+          const feedbackRating = (element as HTMLElement).dataset.feedbackRating as ('thumbs_up' | 'thumbs_down' | undefined);
           
           // Extract recommended questions if present
           const recommendedQuestionsDiv = element.querySelector('.recommended-questions');
@@ -705,6 +714,9 @@ export function initializeChatApp(options: InitOptions = {}) {
           messages.push({
             role: 'assistant',
             content: content,
+            traceId,
+            feedbackSubmitted,
+            feedbackRating,
             recommendedQuestions: recommendedQuestions.length > 0 ? recommendedQuestions : undefined
           });
         }
@@ -817,7 +829,7 @@ export function initializeChatApp(options: InitOptions = {}) {
           if (errorData.detail) {
             errorMessage = errorData.detail;
           }
-        } catch (e) {
+        } catch {
           // Use default error message
         }
         
@@ -934,33 +946,77 @@ export function initializeChatApp(options: InitOptions = {}) {
     `;
   }
   
+  // Add UTM parameter to URLs for tracking
+  function addUtmParameter(url: string): string {
+    if (!url || typeof url !== 'string') return url;
+    
+    // Skip if URL already has utm_source parameter
+    if (url.includes('utm_source=')) return url;
+    
+    try {
+      const urlObj = new URL(url);
+      urlObj.searchParams.set('utm_source', 'ai.cloudfuze.com');
+      return urlObj.toString();
+    } catch {
+      // If URL parsing fails, try simple string append
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}utm_source=ai.cloudfuze.com`;
+    }
+  }
+
   // Convert plain text URLs and markdown links to clickable links, preserving HTML
   function linkifyText(text: string): string {
     // Check if the text already contains HTML tags (from formatted responses)
     const hasHtmlTags = /<[^>]+>/.test(text);
     
+    let processed = text;
+    
     if (hasHtmlTags) {
-      // Text already has HTML formatting, just ensure links open in new tab
-      const processed = text.replace(/<a\s+href="([^"]+)"(?![^>]*target=)/gi, '<a href="$1" target="_blank" rel="noopener noreferrer"');
-      return processed;
+      // Text has HTML formatting (from renderMarkdown)
+      // First, add UTM to existing <a> tags
+      processed = processed.replace(/href\s*=\s*["']([^"']+)["']/gi, (match, url) => {
+        // Skip if URL already has utm_source
+        if (url.includes('utm_source=')) {
+          return match;
+        }
+        // Add UTM parameter
+        const utmUrl = addUtmParameter(url);
+        // Replace just the href value, keeping the quotes
+        const quote = match.includes("'") ? "'" : '"';
+        return `href=${quote}${utmUrl}${quote}`;
+      });
+      
+      // Also handle any remaining markdown links that weren't converted (fallback case)
+      // Only convert markdown links that aren't already inside HTML tags
+      processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+        // Check if this markdown link is inside an HTML tag (shouldn't convert)
+        const beforeMatch = processed.substring(Math.max(0, processed.indexOf(match) - 50), processed.indexOf(match));
+        if (beforeMatch.includes('<') && !beforeMatch.includes('>')) {
+          return match; // Inside an HTML tag, don't convert
+        }
+        const utmUrl = addUtmParameter(url);
+        return `<a href="${utmUrl}" target="_blank" rel="noopener noreferrer" style="color: #0033CC; text-decoration: underline;">${linkText}</a>`;
+      });
+    } else {
+      // Plain text - convert markdown and URLs to links
+      // First handle markdown links [text](url)
+      processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
+        const utmUrl = addUtmParameter(url);
+        return `<a href="${utmUrl}" target="_blank" rel="noopener noreferrer" style="color: #0033CC; text-decoration: underline;">${linkText}</a>`;
+      });
+      
+      // Then handle plain URLs (that aren't already in anchor tags)
+      const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+      processed = processed.replace(urlPattern, (url) => {
+        // Avoid double-linking by checking if URL is already in a href attribute
+        const beforeUrl = processed.substring(Math.max(0, processed.indexOf(url) - 10), processed.indexOf(url));
+        if (beforeUrl.includes('href=')) {
+          return url; // Already linked, don't modify
+        }
+        const utmUrl = addUtmParameter(url);
+        return `<a href="${utmUrl}" target="_blank" rel="noopener noreferrer" style="color: #0033CC; text-decoration: underline;">${url}</a>`;
+      });
     }
-    
-    // Plain text - convert markdown and URLs to links
-    // First handle markdown links [text](url)
-    let processed = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, url) => {
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #0033CC; text-decoration: underline;">${linkText}</a>`;
-    });
-    
-    // Then handle plain URLs (that aren't already in anchor tags)
-    const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-    processed = processed.replace(urlPattern, (url) => {
-      // Avoid double-linking by checking if URL is already in a href attribute
-      const beforeUrl = processed.substring(Math.max(0, processed.indexOf(url) - 10), processed.indexOf(url));
-      if (beforeUrl.includes('href=')) {
-        return url; // Already linked, don't modify
-      }
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #0033CC; text-decoration: underline;">${url}</a>`;
-    });
     
     return processed;
   }
@@ -1010,6 +1066,10 @@ export function initializeChatApp(options: InitOptions = {}) {
         
         const div = document.createElement("div");
         div.className = "message bot";
+        if (msg.traceId) {
+          div.dataset.traceId = msg.traceId;
+          div.setAttribute('data-trace-id', msg.traceId);
+        }
         
         // Render markdown to HTML first, then make links clickable
         let formattedContent = msg.content;
@@ -1043,6 +1103,39 @@ export function initializeChatApp(options: InitOptions = {}) {
           ${recommendedQuestionsHTML}
         `;
         messagesDiv!.appendChild(div);
+
+        // If feedback was already submitted, reflect it in the UI and disable buttons
+        if (msg.feedbackSubmitted) {
+          const feedbackButtons = div.querySelectorAll('.feedback-btn');
+          feedbackButtons.forEach(btn => {
+            const buttonEl = btn as HTMLButtonElement;
+            buttonEl.disabled = true;
+            buttonEl.style.cursor = 'not-allowed';
+            buttonEl.style.opacity = '0.5';
+            buttonEl.classList.remove('selected');
+          });
+
+          // Mark selected state based on stored rating
+          if (msg.feedbackRating) {
+            const targetBtn = div.querySelector(`.feedback-btn.${msg.feedbackRating === 'thumbs_up' ? 'thumbs-up' : 'thumbs-down'}`);
+            if (targetBtn) targetBtn.classList.add('selected');
+          }
+
+          // Show confirmation text in matching color
+          const feedbackText = div.querySelector('.feedback-text') as HTMLElement | null;
+          if (feedbackText) {
+            feedbackText.textContent = msg.feedbackRating === 'thumbs_down'
+              ? "Thanks! We'll improve."
+              : 'Thanks for your feedback!';
+            feedbackText.style.color = msg.feedbackRating === 'thumbs_down' ? '#ef4444' : '#10a37f';
+          }
+
+          // Persist markers on the element
+          div.dataset.feedbackSubmitted = 'true';
+          if (msg.feedbackRating) {
+            div.dataset.feedbackRating = msg.feedbackRating;
+          }
+        }
       }
     });
     
@@ -1431,20 +1524,22 @@ export function initializeChatApp(options: InitOptions = {}) {
       if (remainingSessions.length === 0) {
         // This was the last chat - clear session and wait for user to start typing
         console.log('[DELETE] Last chat deleted - showing welcome screen');
-        sessionId = ''; // Clear session ID
-        localStorage.removeItem('currentSessionId');
+        sessionId = null; // Clear session ID
+        localStorage.removeItem(getUserStorageKey('chatbot_session_id'));
         
         // Show welcome screen with example prompts
         updateEmptyState();
+        reloadSuggestedQuestions();
       } else {
         // There are other chats, but we're not auto-loading them - just create a new empty session
         const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const randomId = Math.random().toString(36).substr(2, 9);
         sessionId = `cf.conversation.${date}.${randomId}`;
-        localStorage.setItem('currentSessionId', sessionId);
+        localStorage.setItem(getUserStorageKey('chatbot_session_id'), sessionId);
         
         // Show welcome screen
         updateEmptyState();
+        reloadSuggestedQuestions();
       }
       
       // INSTANT: Update the history list synchronously (don't wait for async)
@@ -1553,7 +1648,11 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
 
   // Toast notification function
-  function showToast(message: string, type: string = 'info', duration: number = 2000) {
+  function showToast(
+    message: string,
+    type: 'success' | 'error' | 'info' | 'warning' = 'info',
+    duration = 2000
+  ) {
     // Remove existing toast if any
     const existingToast = document.querySelector('.toast-notification');
     if (existingToast) {
@@ -1562,7 +1661,7 @@ export function initializeChatApp(options: InitOptions = {}) {
     
     // Create toast element
     const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
+    toast.className = `toast-notification ${type}`;
     toast.textContent = message;
     document.body.appendChild(toast);
     
@@ -1930,10 +2029,12 @@ export function initializeChatApp(options: InitOptions = {}) {
                 const now = Date.now();
                 if (now - lastRenderTime > renderThrottle) {
                   const contentDiv = botDiv.querySelector('.message-content');
+                  const renderedMarkdown = renderMarkdown(fullResponse);
+                  const contentWithLinks = linkifyText(renderedMarkdown);
                   if (contentDiv) {
-                    contentDiv.innerHTML = renderMarkdown(fullResponse);
+                    contentDiv.innerHTML = contentWithLinks;
                   } else {
-                    botDiv.innerHTML = `<div class="message-content">${renderMarkdown(fullResponse)}</div>`;
+                    botDiv.innerHTML = `<div class="message-content">${contentWithLinks}</div>`;
                   }
                   autoScrollToBottom();
                   lastRenderTime = now;
@@ -1942,6 +2043,14 @@ export function initializeChatApp(options: InitOptions = {}) {
                 fullResponse = data.full_response || fullResponse;
                 const traceId = data.trace_id;
                 const recommendedQuestions = data.recommended_questions || [];
+                
+                // Log trace_id status for debugging
+                if (traceId) {
+                  console.log('[TRACE_ID] ✓ Received trace_id from backend:', traceId);
+                } else {
+                  console.warn('[TRACE_ID] ⚠️ WARNING: No trace_id received from backend');
+                  console.warn('[TRACE_ID] This means Langfuse trace creation failed - feedback will use fallback ID');
+                }
                 
                 if (!fullResponse || fullResponse.trim() === '') {
                   fullResponse = "I apologize, but I wasn't able to generate a response. Please try again.";
@@ -1956,16 +2065,49 @@ export function initializeChatApp(options: InitOptions = {}) {
                 // Build recommended questions HTML
                 const recommendedQuestionsHTML = buildRecommendedQuestionsHTML(recommendedQuestions);
                 
+                // Render markdown and add UTM parameters to all links
+                const renderedMarkdown = renderMarkdown(fullResponse);
+                const contentWithLinks = linkifyText(renderedMarkdown);
+                
+                // ✅ Store trace_id BEFORE generating HTML (so we can disable buttons if missing)
+                if (traceId) {
+                  botDiv.dataset.traceId = traceId;
+                  // Also set the literal attribute so DevTools shows it immediately
+                  botDiv.setAttribute('data-trace-id', traceId);
+                  
+                  // Double-ensure the most recent bot message has the trace_id (in case DOM changes)
+                  const latestBotMessage = messagesDiv?.querySelector('.message.bot:last-of-type') as HTMLElement | null;
+                  if (latestBotMessage) {
+                    latestBotMessage.dataset.traceId = traceId;
+                    latestBotMessage.setAttribute('data-trace-id', traceId);
+                  }
+                  
+                  console.log('[TRACE_ID] ✓ Stored trace_id in botDiv:', traceId);
+                } else {
+                  console.warn('[TRACE_ID] ⚠️ No trace_id to store - feedback buttons will be disabled');
+                }
+                
+                // ✅ Disable feedback buttons if traceId is missing
+                const feedbackDisabled = !traceId;
+                const feedbackDisabledAttr = feedbackDisabled ? 'disabled' : '';
+                const feedbackDisabledClass = feedbackDisabled ? 'disabled' : '';
+                
                 botDiv.innerHTML = `
-                  <div class="message-content">${renderMarkdown(fullResponse)}</div>
+                  <div class="message-content">${contentWithLinks}</div>
                   <div class="feedback-buttons">
                     <button class="copy-button" onclick="window.copyMessage(this)" title="Copy message">
                       <img src="/images/copy-icon.svg?v=2" alt="Copy" width="16" height="16">
                     </button>
-                    <button class="feedback-btn thumbs-up" onclick="window.submitFeedback(this, 'thumbs_up')" title="Good response">
+                    <button class="feedback-btn thumbs-up ${feedbackDisabledClass}" 
+                            onclick="window.submitFeedback(this, 'thumbs_up')" 
+                            title="${feedbackDisabled ? 'Feedback unavailable (trace_id missing)' : 'Good response'}"
+                            ${feedbackDisabledAttr}>
                       <img src="/images/thumbs-up-icon.svg?v=2" alt="Thumbs up" width="16" height="16">
                     </button>
-                    <button class="feedback-btn thumbs-down" onclick="window.submitFeedback(this, 'thumbs_down')" title="Bad response">
+                    <button class="feedback-btn thumbs-down ${feedbackDisabledClass}" 
+                            onclick="window.submitFeedback(this, 'thumbs_down')" 
+                            title="${feedbackDisabled ? 'Feedback unavailable (trace_id missing)' : 'Bad response'}"
+                            ${feedbackDisabledAttr}>
                       <img src="/images/thumbs-down-icon.svg?v=2" alt="Thumbs down" width="16" height="16">
                     </button>
                     <span class="feedback-text"></span>
@@ -1973,20 +2115,58 @@ export function initializeChatApp(options: InitOptions = {}) {
                   ${recommendedQuestionsHTML}
                 `;
                 
+                // Propagate trace_id to feedback buttons so click handlers always have access
                 if (traceId) {
-                  botDiv.dataset.traceId = traceId;
+                  const feedbackButtons = botDiv.querySelectorAll('.feedback-btn');
+                  feedbackButtons.forEach(btn => {
+                    (btn as HTMLElement).dataset.traceId = traceId;
+                  });
                 }
                 
                 // Save session after bot response
                 saveCurrentSession();
                 
-                // If this was a new session from /chat/new, navigate to the session-specific URL
+                // If this was a new session from /chat/new, update URL to session-specific path
+                // ✅ CRITICAL FIX: Only update URL AFTER streaming is completely done
+                // ✅ Use window.history.replaceState() to update URL WITHOUT triggering Next.js navigation
+                // ✅ This prevents page reload while still updating the browser URL
                 if (router && sessionId && isNewSessionPendingNavigation) {
-                  console.log('[SESSION] First message complete, navigating to /chat/' + sessionId);
-                  isNewSessionPendingNavigation = false; // Clear flag
-                  setTimeout(() => {
-                    router.push(`/chat/${sessionId}`);
-                  }, 100); // Small delay to ensure UI updates first
+                  const currentPath = window.location.pathname;
+                  const targetPath = `/chat/${sessionId}`;
+                  
+                  // ✅ Only update URL if:
+                  // 1. We're not already on the target path
+                  // 2. Streaming is completely done (we're in the 'done' event handler)
+                  // 3. We're actually on /chat/new route
+                  if (currentPath !== targetPath && currentPath === '/chat/new') {
+                    console.log('[SESSION] First message complete, updating URL to /chat/' + sessionId);
+                    isNewSessionPendingNavigation = false; // Clear flag
+                    
+                    // ✅ CRITICAL FIX: Use window.history.replaceState() instead of router.replace()
+                    // This updates the URL without triggering Next.js route change or page reload
+                    // We use a longer delay to ensure streaming is completely finished
+                    setTimeout(() => {
+                      if (typeof window !== 'undefined' && window.history && !isGenerating) {
+                        try {
+                          // Update browser URL without navigation
+                          // This should NOT trigger Next.js route change
+                          const currentState = window.history.state || {};
+                          window.history.replaceState(
+                            { ...currentState, as: targetPath, url: targetPath },
+                            '',
+                            targetPath
+                          );
+                          console.log('[SESSION] ✓ URL updated to:', targetPath, '(no page reload)');
+                        } catch (e) {
+                          console.error('[SESSION] Failed to update URL:', e);
+                        }
+                      }
+                    }, 500); // Longer delay to ensure streaming is completely done
+                  } else {
+                    // Already on correct path or not on /chat/new, just clear the flag
+                    console.log('[SESSION] Skipping URL update - current path:', currentPath, 'target:', targetPath);
+                    isNewSessionPendingNavigation = false;
+                  }
                 }
                 
                 // Re-enable send buttons after response complete
@@ -2081,11 +2261,21 @@ export function initializeChatApp(options: InitOptions = {}) {
   async function submitFeedback(button: HTMLElement, rating: string) {
     try {
       const messageDiv = button.closest('.message.bot') as HTMLElement;
-      if (!messageDiv) return;
+      if (!messageDiv) {
+        console.error('[FEEDBACK] Could not find message div');
+        return;
+      }
       
-      const traceId = messageDiv.dataset.traceId || messageDiv.dataset.traceid;
+      const traceId =
+        messageDiv.dataset.traceId ||
+        messageDiv.dataset.traceid ||
+        (button as HTMLElement).dataset.traceId ||
+        button.getAttribute('data-trace-id') ||
+        (button.closest('[data-trace-id]') as HTMLElement | null)?.dataset.traceId ||
+        '';
       
       if (messageDiv.dataset.feedbackSubmitted === 'true') {
+        console.log('[FEEDBACK] Feedback already submitted for this message');
         return;
       }
       
@@ -2104,11 +2294,46 @@ export function initializeChatApp(options: InitOptions = {}) {
         buttonEl.style.opacity = '0.5';
       });
       
-      let finalTraceId = traceId;
-      if (!traceId) {
-        const fallbackTraceId = 'feedback_fallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        messageDiv.dataset.traceId = fallbackTraceId;
-        finalTraceId = fallbackTraceId;
+      // Show loading state
+      const feedbackText = messageDiv.querySelector('.feedback-text') as HTMLElement;
+      if (feedbackText) {
+        feedbackText.textContent = 'Submitting...';
+        feedbackText.style.color = '#6b7280';
+      }
+      
+      // ✅ STRICT VALIDATION: trace_id is REQUIRED (no fallback)
+      if (!traceId || traceId.trim() === '') {
+        console.error('[FEEDBACK] ✗ Cannot submit feedback: trace_id is missing');
+        // Re-enable buttons
+        feedbackButtons.forEach((btn) => {
+          const buttonEl = btn as HTMLButtonElement;
+          buttonEl.disabled = false;
+          buttonEl.style.cursor = 'pointer';
+          buttonEl.style.opacity = '1';
+        });
+        if (feedbackText) {
+          feedbackText.textContent = 'Feedback unavailable: trace_id missing';
+          (feedbackText as HTMLElement).style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            (feedbackText as HTMLElement).style.color = '';
+          }, 5000);
+        }
+        return;
+      }
+      
+      // ✅ REJECT fallback trace_ids
+      if (traceId.startsWith('feedback_fallback_')) {
+        console.error('[FEEDBACK] ✗ Cannot submit feedback: invalid fallback trace_id');
+        if (feedbackText) {
+          feedbackText.textContent = 'Invalid trace_id. Please refresh and try again.';
+          (feedbackText as HTMLElement).style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            (feedbackText as HTMLElement).style.color = '';
+          }, 5000);
+        }
+        return;
       }
       
       const apiBase = getApiBase();
@@ -2116,6 +2341,21 @@ export function initializeChatApp(options: InitOptions = {}) {
       
       if (!currentUser || !currentUser.access_token) {
         console.error('[FEEDBACK] User not authenticated');
+        // Re-enable buttons
+        feedbackButtons.forEach((btn) => {
+          const buttonEl = btn as HTMLButtonElement;
+          buttonEl.disabled = false;
+          buttonEl.style.cursor = 'pointer';
+          buttonEl.style.opacity = '1';
+        });
+        if (feedbackText) {
+          feedbackText.textContent = 'Authentication required';
+          (feedbackText as HTMLElement).style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            (feedbackText as HTMLElement).style.color = '';
+          }, 3000);
+        }
         return;
       }
       
@@ -2126,7 +2366,7 @@ export function initializeChatApp(options: InitOptions = {}) {
           "Authorization": `Bearer ${currentUser.access_token}`
         },
         body: JSON.stringify({
-          trace_id: finalTraceId,
+          trace_id: traceId,  // ✅ Always use real trace_id (no fallback)
           rating: rating,
           comment: "",
           categories: []
@@ -2135,28 +2375,111 @@ export function initializeChatApp(options: InitOptions = {}) {
       
       if (response.ok) {
         messageDiv.dataset.feedbackSubmitted = 'true';
+        messageDiv.dataset.feedbackRating = 'thumbs_up';
         feedbackButtons.forEach((btn) => btn.classList.remove('selected'));
         button.classList.add('selected');
         
-        const feedbackText = messageDiv.querySelector('.feedback-text')!;
-        feedbackText.textContent = 'Thanks for your feedback!';
+        if (feedbackText) {
+          feedbackText.textContent = 'Thanks for your feedback!';
+          (feedbackText as HTMLElement).style.color = '#10a37f';
+          
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            (feedbackText as HTMLElement).style.color = '';
+          }, 3000);
+        }
         
-        setTimeout(() => {
-          feedbackText.textContent = '';
-        }, 3000);
+        console.log('[FEEDBACK] ✓ Feedback submitted successfully');
+        // Persist feedback state to session storage
+        saveCurrentSession();
+      } else {
+        // API error - re-enable buttons
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[FEEDBACK] API error:', response.status, errorText);
+        
+        feedbackButtons.forEach((btn) => {
+          const buttonEl = btn as HTMLButtonElement;
+          buttonEl.disabled = false;
+          buttonEl.style.cursor = 'pointer';
+          buttonEl.style.opacity = '1';
+        });
+        
+        if (feedbackText) {
+          feedbackText.textContent = 'Failed to submit. Try again.';
+          (feedbackText as HTMLElement).style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            (feedbackText as HTMLElement).style.color = '';
+          }, 3000);
+        }
+        
+        showToast('Failed to submit feedback. Please try again.');
       }
     } catch (error) {
       console.error("Error submitting feedback:", error);
+      
+      // Re-enable buttons on error
+      const messageDiv = button.closest('.message.bot') as HTMLElement;
+      if (messageDiv) {
+        const feedbackButtons = messageDiv.querySelectorAll('.feedback-btn');
+        feedbackButtons.forEach((btn) => {
+          const buttonEl = btn as HTMLButtonElement;
+          buttonEl.disabled = false;
+          buttonEl.style.cursor = 'pointer';
+          buttonEl.style.opacity = '1';
+        });
+        
+        const feedbackText = messageDiv.querySelector('.feedback-text') as HTMLElement;
+        if (feedbackText) {
+          feedbackText.textContent = 'Network error. Try again.';
+          feedbackText.style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            feedbackText.style.color = '';
+          }, 3000);
+        }
+      }
+      
+      showToast('Network error. Please check your connection and try again.');
     }
   }
 
   function showFeedbackModal(messageDiv: HTMLElement, traceId: string) {
     const modal = document.getElementById('feedback-modal');
-    if (!modal) return;
+    if (!modal) {
+      console.error('[FEEDBACK] Feedback modal not found in DOM');
+      return;
+    }
+    
+    // ✅ STRICT VALIDATION: Check if traceId is available
+    const finalTraceId = messageDiv.dataset.traceId || traceId || '';
+    if (!finalTraceId || finalTraceId.trim() === '' || finalTraceId.startsWith('feedback_fallback_')) {
+      console.error('[FEEDBACK] ✗ Cannot show feedback modal: trace_id is missing or invalid');
+      const feedbackText = messageDiv.querySelector('.feedback-text') as HTMLElement;
+      if (feedbackText) {
+        feedbackText.textContent = 'Feedback unavailable: trace_id missing';
+        feedbackText.style.color = '#dc3545';
+        setTimeout(() => {
+          feedbackText.textContent = '';
+          feedbackText.style.color = '';
+        }, 5000);
+      }
+      return;
+    }
+    
+    // Check if feedback already submitted
+    if (messageDiv.dataset.feedbackSubmitted === 'true') {
+      console.log('[FEEDBACK] Feedback already submitted for this message');
+      return;
+    }
+    
+    // Store reference to message div using a unique identifier
+    const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    messageDiv.dataset.feedbackMessageId = messageId;
     
     // Store reference to message for later submission
-    modal.dataset.messageId = messageDiv.dataset.traceId || traceId;
-    modal.dataset.traceId = traceId;
+    modal.dataset.messageId = messageId;
+    modal.dataset.traceId = finalTraceId;  // ✅ Use validated trace_id
     
     // Reset modal state - clear all category selections
     const categoryBtns = modal.querySelectorAll('.feedback-category-btn');
@@ -2174,10 +2497,50 @@ export function initializeChatApp(options: InitOptions = {}) {
 
   async function submitDetailedFeedback() {
     const modal = document.getElementById('feedback-modal');
-    if (!modal) return;
+    if (!modal) {
+      console.error('[FEEDBACK] Feedback modal not found');
+      return;
+    }
     
-    const traceId = modal.dataset.traceId || '';
-    const messageDiv = document.querySelector(`[data-trace-id="${traceId}"]`) as HTMLElement;
+    // Find message div using the stored message ID
+    const messageId = modal.dataset.messageId || '';
+    let messageDiv: HTMLElement | null = null;
+    
+    if (messageId) {
+      messageDiv = document.querySelector(`[data-feedback-message-id="${messageId}"]`) as HTMLElement;
+    }
+    
+    // Fallback: try to find by trace ID if message ID not found
+    if (!messageDiv) {
+      const traceId = modal.dataset.traceId || '';
+      if (traceId) {
+        // Try both camelCase and kebab-case selectors
+        messageDiv = document.querySelector(`[data-trace-id="${traceId}"]`) as HTMLElement ||
+                     document.querySelector(`[data-traceId="${traceId}"]`) as HTMLElement;
+      }
+    }
+    
+    // Last resort: find the most recent bot message
+    if (!messageDiv) {
+      const allBotMessages = document.querySelectorAll('.message.bot');
+      if (allBotMessages.length > 0) {
+        messageDiv = allBotMessages[allBotMessages.length - 1] as HTMLElement;
+        console.warn('[FEEDBACK] Using fallback: found message by position');
+      }
+    }
+    
+    if (!messageDiv) {
+      console.error('[FEEDBACK] Could not find message div for feedback submission');
+        showToast('Error: Could not submit feedback. Please try again.');
+      return;
+    }
+    
+    // Check if feedback already submitted
+    if (messageDiv.dataset.feedbackSubmitted === 'true') {
+      console.log('[FEEDBACK] Feedback already submitted for this message');
+      modal.style.display = 'none';
+      return;
+    }
     
     // Get selected categories
     const selectedCategories: string[] = [];
@@ -2193,18 +2556,62 @@ export function initializeChatApp(options: InitOptions = {}) {
     const commentTextarea = document.getElementById('feedback-comment') as HTMLTextAreaElement;
     const comment = commentTextarea ? commentTextarea.value.trim() : '';
     
-    // Close modal
+    // Close modal immediately for better UX
     modal.style.display = 'none';
+    
+    // Disable buttons while submitting
+    const feedbackButtons = messageDiv.querySelectorAll('.feedback-btn');
+    feedbackButtons.forEach((btn) => {
+      const buttonEl = btn as HTMLButtonElement;
+      buttonEl.disabled = true;
+      buttonEl.style.cursor = 'not-allowed';
+      buttonEl.style.opacity = '0.5';
+    });
+    
+    // Show loading state
+    const feedbackText = messageDiv.querySelector('.feedback-text') as HTMLElement;
+    if (feedbackText) {
+      feedbackText.textContent = 'Submitting feedback...';
+      feedbackText.style.color = '#6b7280';
+    }
     
     // Submit feedback
     try {
-      let finalTraceId = traceId;
-      if (!traceId) {
-        const fallbackTraceId = 'feedback_fallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        if (messageDiv) {
-          messageDiv.dataset.traceId = fallbackTraceId;
+      const traceId = modal.dataset.traceId || messageDiv.dataset.traceId || messageDiv.dataset.traceid || '';
+      
+      // ✅ STRICT VALIDATION: trace_id is REQUIRED (no fallback)
+      if (!traceId || traceId.trim() === '') {
+        console.error('[FEEDBACK] ✗ Cannot submit feedback: trace_id is missing');
+        // Re-enable buttons
+        feedbackButtons.forEach((btn) => {
+          const buttonEl = btn as HTMLButtonElement;
+          buttonEl.disabled = false;
+          buttonEl.style.cursor = 'pointer';
+          buttonEl.style.opacity = '1';
+        });
+        if (feedbackText) {
+          feedbackText.textContent = 'Feedback unavailable: trace_id missing';
+          feedbackText.style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            feedbackText.style.color = '';
+          }, 5000);
         }
-        finalTraceId = fallbackTraceId;
+        return;
+      }
+      
+      // ✅ REJECT fallback trace_ids
+      if (traceId.startsWith('feedback_fallback_')) {
+        console.error('[FEEDBACK] ✗ Cannot submit feedback: invalid fallback trace_id');
+        if (feedbackText) {
+          feedbackText.textContent = 'Invalid trace_id. Please refresh and try again.';
+          feedbackText.style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            feedbackText.style.color = '';
+          }, 5000);
+        }
+        return;
       }
       
       const apiBase = getApiBase();
@@ -2212,6 +2619,21 @@ export function initializeChatApp(options: InitOptions = {}) {
       
       if (!currentUser || !currentUser.access_token) {
         console.error('[FEEDBACK] User not authenticated');
+        // Re-enable buttons
+        feedbackButtons.forEach((btn) => {
+          const buttonEl = btn as HTMLButtonElement;
+          buttonEl.disabled = false;
+          buttonEl.style.cursor = 'pointer';
+          buttonEl.style.opacity = '1';
+        });
+        if (feedbackText) {
+          feedbackText.textContent = 'Authentication required. Please refresh the page.';
+          feedbackText.style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            feedbackText.style.color = '';
+          }, 5000);
+        }
         return;
       }
       
@@ -2222,15 +2644,15 @@ export function initializeChatApp(options: InitOptions = {}) {
           "Authorization": `Bearer ${currentUser.access_token}`
         },
         body: JSON.stringify({
-          trace_id: finalTraceId,
+          trace_id: traceId,  // ✅ Always use real trace_id (no fallback)
           rating: 'thumbs_down',
           comment: comment,
           categories: selectedCategories
         }),
       });
       
-      if (response.ok && messageDiv) {
-        const feedbackButtons = messageDiv.querySelectorAll('.feedback-btn');
+      if (response.ok) {
+        // Success - update UI
         feedbackButtons.forEach((btn) => {
           const buttonEl = btn as HTMLButtonElement;
           buttonEl.disabled = true;
@@ -2245,18 +2667,66 @@ export function initializeChatApp(options: InitOptions = {}) {
         }
         
         messageDiv.dataset.feedbackSubmitted = 'true';
+        messageDiv.dataset.feedbackRating = 'thumbs_down';
         
-        const feedbackText = messageDiv.querySelector('.feedback-text');
         if (feedbackText) {
           feedbackText.textContent = 'Thanks! We\'ll improve.';
+          // Match thumbs-down brand color for clarity
+          feedbackText.style.color = '#ef4444';
           
           setTimeout(() => {
             feedbackText.textContent = '';
+            feedbackText.style.color = '';
           }, 3000);
         }
+        
+        console.log('[FEEDBACK] ✓ Feedback submitted successfully');
+        // Persist feedback state to session storage
+        saveCurrentSession();
+      } else {
+        // API error - re-enable buttons and show error
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[FEEDBACK] API error:', response.status, errorText);
+        
+        feedbackButtons.forEach((btn) => {
+          const buttonEl = btn as HTMLButtonElement;
+          buttonEl.disabled = false;
+          buttonEl.style.cursor = 'pointer';
+          buttonEl.style.opacity = '1';
+        });
+        
+        if (feedbackText) {
+          feedbackText.textContent = 'Failed to submit. Please try again.';
+          feedbackText.style.color = '#dc3545';
+          setTimeout(() => {
+            feedbackText.textContent = '';
+            feedbackText.style.color = '';
+          }, 5000);
+        }
+        
+        showToast('Failed to submit feedback. Please try again.');
       }
     } catch (error) {
-      console.error("Error submitting detailed feedback:", error);
+      console.error("[FEEDBACK] Error submitting detailed feedback:", error);
+      
+      // Re-enable buttons on error
+      feedbackButtons.forEach((btn) => {
+        const buttonEl = btn as HTMLButtonElement;
+        buttonEl.disabled = false;
+        buttonEl.style.cursor = 'pointer';
+        buttonEl.style.opacity = '1';
+      });
+      
+      if (feedbackText) {
+        feedbackText.textContent = 'Network error. Please try again.';
+        feedbackText.style.color = '#dc3545';
+        setTimeout(() => {
+          feedbackText.textContent = '';
+          feedbackText.style.color = '';
+        }, 5000);
+      }
+      
+      showToast('Network error. Please check your connection and try again.');
     }
   }
 
@@ -2446,23 +2916,14 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
 
   // Expose ALL functions to window for onclick handlers
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).copyMessage = copyMessage;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).copyUserMessage = copyUserMessage;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).submitFeedback = submitFeedback;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).editMessage = editMessage;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).cancelEdit = cancelEdit;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).saveEdit = saveEdit;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).askRecommendedQuestion = askRecommendedQuestion;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).showFeedbackModal = showFeedbackModal;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).submitDetailedFeedback = submitDetailedFeedback;
 
   // ============================================================================
@@ -2647,13 +3108,17 @@ export function initializeChatApp(options: InitOptions = {}) {
             messagesDiv.innerHTML = '';
           }
           updateEmptyState();
+
+          // Reload suggested questions for fresh chat start
+          const emptyContainer = document.getElementById('suggested-questions-empty');
+          const mainContainer = document.getElementById('suggested-questions-main');
+          if (emptyContainer) emptyContainer.innerHTML = '';
+          if (mainContainer) mainContainer.innerHTML = '';
+          loadSuggestedQuestions();
         }
         
         // Update initialization state after session switch
         currentInitializedSessionId = initialSessionId || null;
-        if (router) {
-          currentRouter = router;
-        }
         return;
       }
       
@@ -2702,9 +3167,6 @@ export function initializeChatApp(options: InitOptions = {}) {
       // Mark as initialized
       isAppInitialized = true;
       currentInitializedSessionId = initialSessionId || null;
-      if (router) {
-        currentRouter = router;
-      }
     }
   }
 
@@ -2761,8 +3223,11 @@ export function initializeChatApp(options: InitOptions = {}) {
               // Create bot message with recommendations
               const div = document.createElement("div");
               div.className = "message bot";
+              // Render markdown and add UTM parameters to all links
+              const renderedMarkdown = renderMarkdown(message.content);
+              const contentWithLinks = linkifyText(renderedMarkdown);
               div.innerHTML = `
-                <div class="message-content">${renderMarkdown(message.content)}</div>
+                <div class="message-content">${contentWithLinks}</div>
                 <div class="feedback-buttons">
                   <button class="copy-button" onclick="window.copyMessage(this)" title="Copy message">
                     <img src="/images/copy-icon.svg?v=2" alt="Copy" width="16" height="16">
@@ -3090,7 +3555,16 @@ export function initializeChatApp(options: InitOptions = {}) {
   
   const userMenu = document.getElementById('userMenu');
   if (userMenu) {
+    // Support both click and hover to open the user dropdown
     userMenu.addEventListener('click', toggleDropdown);
+    userMenu.addEventListener('mouseenter', () => {
+      const dropdown = document.getElementById('userDropdown');
+      if (dropdown) dropdown.classList.add('show');
+    });
+    userMenu.addEventListener('mouseleave', () => {
+      const dropdown = document.getElementById('userDropdown');
+      if (dropdown) dropdown.classList.remove('show');
+    });
   }
   
   const logoutBtn = document.getElementById('logoutBtn');

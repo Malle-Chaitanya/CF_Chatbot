@@ -70,3 +70,5 @@ sentence-transformers>=2.7.0  # Compatible with huggingface-hub>=0.34.0 (cached_
 # python-magic==0.4.27             # File detection - not used
 # spacy==3.7.2                     # NLP - not imported anywhere
 # Pillow==10.2.0                   # Image processing - not used
+google-generativeai>=0.3.0
+langchain-google-genai>=0.1.0

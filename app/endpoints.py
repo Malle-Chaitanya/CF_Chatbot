@@ -1324,6 +1324,13 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
                 except Exception as e:
                     print(f"[WARNING] Failed to generate recommendations: {e}")
                 
+                # Log trace_id status for debugging
+                if trace_id:
+                    print(f"[TRACE_ID] ✓ Sending trace_id to frontend: {trace_id}")
+                else:
+                    print(f"[TRACE_ID] ⚠️ WARNING: trace_id is None - feedback will use fallback ID")
+                    print(f"[TRACE_ID] This means Langfuse trace creation failed - check Langfuse configuration")
+                
                 yield f"data: {json.dumps({'type': 'done', 'full_response': full_response, 'trace_id': trace_id, 'recommended_questions': recommended_questions})}\n\n"
                 return
             
@@ -1410,6 +1417,13 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
                     )
                 except Exception as e:
                     print(f"[WARNING] Failed to generate recommendations: {e}")
+                
+                # Log trace_id status for debugging
+                if trace_id:
+                    print(f"[TRACE_ID] ✓ Sending trace_id to frontend: {trace_id}")
+                else:
+                    print(f"[TRACE_ID] ⚠️ WARNING: trace_id is None - feedback will use fallback ID")
+                    print(f"[TRACE_ID] This means Langfuse trace creation failed - check Langfuse configuration")
                 
                 # Send completion signal with trace_id and recommendations
                 yield f"data: {json.dumps({'type': 'done', 'full_response': full_response, 'trace_id': trace_id, 'recommended_questions': recommended_questions})}\n\n"
@@ -1648,6 +1662,46 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
                         final_docs_with_scores.append((final_doc, score))
                         break
             
+            # ============ SCORE-BASED RELEVANCE FILTERING ============
+            # Filter out documents with poor relevance scores to prevent hallucination
+            if final_docs_with_scores:
+                scores = [score for _, score in final_docs_with_scores]
+                max_score = max(scores)
+                avg_score = sum(scores) / len(scores)
+                score_margin = max_score - avg_score
+                
+                print(f"[SCORE FILTERING] Max: {max_score:.3f}, Avg: {avg_score:.3f}, Margin: {score_margin:.3f}")
+                
+                # Apply quality gates
+                # Gate 1: Maximum score must be above threshold
+                # Gate 2: There must be sufficient separation (avoid all-mediocre results)
+                from config import MIN_SCORE_THRESHOLD, SCORE_MARGIN_THRESHOLD
+                
+                if max_score < MIN_SCORE_THRESHOLD:
+                    print(f"[SCORE FILTERING] ❌ Max score {max_score:.3f} below threshold {MIN_SCORE_THRESHOLD}")
+                    print(f"[SCORE FILTERING] All documents deemed irrelevant - returning no context")
+                    final_docs_with_scores = []
+                    final_docs = []
+                elif score_margin < SCORE_MARGIN_THRESHOLD and avg_score < 0:
+                    print(f"[SCORE FILTERING] ⚠️ Low score margin {score_margin:.3f} with negative avg {avg_score:.3f}")
+                    print(f"[SCORE FILTERING] All documents mediocre - returning no context")
+                    final_docs_with_scores = []
+                    final_docs = []
+                else:
+                    # Keep only documents above a reasonable threshold
+                    # Use dynamic threshold: avg_score - 1.0 (or MIN_SCORE_THRESHOLD, whichever is higher)
+                    dynamic_threshold = max(MIN_SCORE_THRESHOLD, avg_score - 1.0)
+                    filtered = [(doc, score) for doc, score in final_docs_with_scores if score > dynamic_threshold]
+                    
+                    if filtered:
+                        final_docs_with_scores = filtered
+                        final_docs = [doc for doc, score in filtered]
+                        print(f"[SCORE FILTERING] ✅ Kept {len(final_docs)} docs above dynamic threshold {dynamic_threshold:.3f}")
+                    else:
+                        print(f"[SCORE FILTERING] ❌ All docs below dynamic threshold")
+                        final_docs_with_scores = []
+                        final_docs = []
+            
             doc_analysis = analyze_retrieved_documents(final_docs_with_scores)
             
             # ===== LOG RETRIEVAL TO LANGFUSE =====
@@ -1666,18 +1720,20 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
                         retrieved_docs=final_docs,
                         doc_count=len(final_docs),
                         sources_breakdown=trace_sources,
-                        metadata={"search_k": 50, "final_k": len(final_docs)}
+                        metadata={"search_k": 50, "final_k": len(final_docs), "score_filtered": len(final_docs_with_scores) < len(doc_results)}
                     )
                 except Exception as e:
                     print(f"[WARNING] Failed to log retrieval: {e}")
             
             # Format the documents properly with metadata using format_docs from llm.py
+            forced_no_context = False  # Track if we're forcing no-context response
             try:
                 from app.llm import format_docs
                 
                 if not final_docs:
-                    print("[WARNING] No documents retrieved for context!")
-                    context_text = "No relevant documents found in the knowledge base."
+                    print("[WARNING] No relevant documents after score filtering!")
+                    context_text = ""  # Empty context, not "No relevant documents found"
+                    forced_no_context = True
                 else:
                     formatted_docs = format_docs(final_docs)
                     context_text = "\n\n".join([f"Document {i+1}:\n{formatted_doc}" for i, formatted_doc in enumerate(formatted_docs)])
@@ -1772,10 +1828,21 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
             from langchain_core.prompts import ChatPromptTemplate
             from config import SYSTEM_PROMPT
             
-            prompt_template = ChatPromptTemplate.from_messages([
-                ("system", SYSTEM_PROMPT),
-                ("human", "Context: {context}\n\nQuestion: {question}")
-            ])
+            # Adapt prompt based on whether we have relevant context
+            if forced_no_context:
+                # No relevant documents - explicitly tell LLM
+                prompt_template = ChatPromptTemplate.from_messages([
+                    ("system", SYSTEM_PROMPT + "\n\nIMPORTANT: No relevant documents were found in the knowledge base for this query."),
+                    ("human", "Question: {question}")
+                ])
+                messages = prompt_template.format_messages(question=enhanced_query)
+            else:
+                # Normal flow with context
+                prompt_template = ChatPromptTemplate.from_messages([
+                    ("system", SYSTEM_PROMPT),
+                    ("human", "Context: {context}\n\nQuestion: {question}")
+                ])
+                messages = prompt_template.format_messages(context=context_text, question=enhanced_query)
             
             # ===== START SYNTHESIS SPAN =====
             if rag_trace:
@@ -1786,7 +1853,8 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
                             "context_length": len(context_text),
                             "document_count": len(final_docs),
                             "model": "gpt-4o-mini",
-                            "temperature": 0.1
+                            "temperature": 0.1,
+                            "forced_no_context": forced_no_context
                         }
                     )
                 except Exception as e:
@@ -1794,7 +1862,7 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
             
             # Stream the response with real-time streaming
             full_response = ""
-            messages = prompt_template.format_messages(context=context_text, question=enhanced_query)
+            # messages already created above based on forced_no_context
             async for chunk in llm.astream(messages):
                 if hasattr(chunk, 'content'):
                     token = chunk.content
@@ -2006,6 +2074,13 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
                 print(f"[RECOMMENDATIONS] Generated {len(recommended_questions)} follow-up questions")
             except Exception as e:
                 print(f"[WARNING] Failed to generate recommendations: {e}")
+            
+            # Log trace_id status for debugging
+            if trace_id:
+                print(f"[TRACE_ID] ✓ Sending trace_id to frontend: {trace_id}")
+            else:
+                print(f"[TRACE_ID] ⚠️ WARNING: trace_id is None - feedback will use fallback ID")
+                print(f"[TRACE_ID] This means Langfuse trace creation failed - check Langfuse configuration")
             
             # Send completion signal with trace_id and recommendations
             yield f"data: {json.dumps({'type': 'done', 'full_response': full_response, 'trace_id': trace_id, 'recommended_questions': recommended_questions})}\n\n"
@@ -2393,10 +2468,29 @@ async def submit_feedback(request: FeedbackRequest):
         print(f"  - categories: {request.categories}")
         print(f"  - comment: {request.comment or '(none)'}")
         
+        # ✅ STRICT VALIDATION: trace_id is REQUIRED (no fallback)
+        if not request.trace_id or request.trace_id.strip() == "":
+            print(f"[FEEDBACK] ✗ Missing trace_id - feedback rejected")
+            raise HTTPException(
+                status_code=400,
+                detail="trace_id is required. Feedback cannot be submitted without a valid trace_id."
+            )
+        
+        # ✅ REJECT fallback trace_ids (they don't exist in Langfuse)
+        if request.trace_id.startswith('feedback_fallback_'):
+            print(f"[FEEDBACK] ✗ Rejected fallback trace_id: {request.trace_id}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid trace_id. Feedback cannot be submitted with a fallback trace_id. Please ensure the chat response included a valid trace_id."
+            )
+        
         # Validate rating
         if request.rating not in ["thumbs_up", "thumbs_down"]:
             print(f"[FEEDBACK] ✗ Invalid rating: {request.rating}")
-            return {"error": "Invalid rating. Must be 'thumbs_up' or 'thumbs_down'"}
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid rating. Must be 'thumbs_up' or 'thumbs_down'"
+            )
         
         # Build comprehensive feedback comment
         feedback_comment = request.comment or ""
