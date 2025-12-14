@@ -136,7 +136,13 @@ export default function SharedChatPage() {
 
         const data = await response.json();
         
-        console.log('[SHARED] Chat copied successfully:', data.session_id);
+        // Check if this is an existing copy or a new one
+        if (data.is_existing) {
+          console.log('[SHARED] Redirecting to existing copy:', data.session_id);
+        } else {
+          console.log('[SHARED] Chat copied successfully:', data.session_id);
+        }
+        
         console.log('[SHARED] Messages in response:', data.messages?.length || 0);
         console.log('[SHARED] Full response:', data);
         
@@ -156,7 +162,7 @@ export default function SharedChatPage() {
               messages: data.messages || []
             };
             
-            // Get existing sessions and prepend this new one
+            // Get existing sessions and prepend this one (or update if it exists)
             const existingSessions = JSON.parse(localStorage.getItem(storageKey) || '[]');
             const updatedSessions = [
               sessionToStore,
@@ -166,6 +172,7 @@ export default function SharedChatPage() {
             localStorage.setItem(storageKey, JSON.stringify(updatedSessions));
             console.log('[SHARED] Stored session in localStorage before redirect:', sessionToStore.id);
             console.log('[SHARED] Stored messages count:', sessionToStore.messages.length);
+            console.log('[SHARED] Is existing copy:', data.is_existing || false);
           }
         } catch (e) {
           console.warn('[SHARED] Failed to store session in localStorage:', e);
@@ -174,7 +181,7 @@ export default function SharedChatPage() {
         
         console.log('[SHARED] Redirecting to /chat/', data.session_id);
         
-        // Redirect to the new session in user's own chats
+        // Redirect to the session in user's own chats
         router.replace(`/chat/${data.session_id}`);
         
       } catch (error) {

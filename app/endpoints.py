@@ -2367,13 +2367,19 @@ async def share_chat_session(
             print(f"[SHARE] Using most recent session from user {target_user_id}: {actual_session_id}")
         
         # Get session to verify it exists
-        session = await get_session_by_id(actual_session_id, include_messages=False)
+        session = await get_session_by_id(actual_session_id, include_messages=True)
         if not session:
             print(f"[SHARE] Session {actual_session_id} not found")
             raise HTTPException(
                 status_code=404, 
                 detail=f"Session not found. Make sure the chat is saved before sharing."
             )
+        
+        # Debug: Check if session has messages
+        message_count = len(session.get("messages", []))
+        print(f"[SHARE] Session {actual_session_id} has {message_count} messages")
+        if message_count == 0:
+            print(f"[SHARE] ⚠️ WARNING: Sharing a chat with no messages!")
         
         # Verify user owns this session (skip check for others' chats - they're sharing the original owner's chat)
         if not is_others_chat and session.get("user_id") != auth_user["user_id"]:
@@ -2410,22 +2416,73 @@ async def get_shared_chat_session(
 ):
     """Retrieve and copy a shared chat to the authenticated user's sessions."""
     try:
-        from app.mongodb_memory import get_shared_chat
+        from app.mongodb_memory import get_shared_chat  # , find_session_by_share_token
         
         # Get shared chat info
         shared_chat = await get_shared_chat(share_token)
         if not shared_chat:
             raise HTTPException(status_code=404, detail="Shared chat not found or expired")
         
+        # ============================================================
+        # DUPLICATE PREVENTION - COMMENTED OUT FOR NOW
+        # Uncomment this section to prevent duplicate copies
+        # ============================================================
+        # Check if user already has a copy of this shared chat
+        # existing_copy = await find_session_by_share_token(
+        #     user_id=auth_user["user_id"],
+        #     share_token=share_token
+        # )
+        # 
+        # if existing_copy:
+        #     # User already has this chat, return existing copy
+        #     print(f"[SHARE] User {auth_user['email']} already has copy of this chat: {existing_copy['session_id']}")
+        #     return {
+        #         "session_id": existing_copy["session_id"],
+        #         "title": existing_copy["title"],
+        #         "messages": existing_copy.get("messages", []),
+        #         "created_at": existing_copy["created_at"],
+        #         "updated_at": existing_copy["updated_at"],
+        #         "original_owner": shared_chat["user_email"],
+        #         "message": "Redirecting to your existing copy",
+        #         "is_existing": True  # Flag to indicate this is not a new copy
+        #     }
+        # ============================================================
+        
         # Get the original session with messages
         original_session = await get_session_by_id(shared_chat["session_id"], include_messages=True)
         if not original_session:
             raise HTTPException(status_code=404, detail="Original session not found")
         
+        # Debug: Log message count
+        message_count = len(original_session.get("messages", []))
+        print(f"[SHARE] Original session {shared_chat['session_id']} has {message_count} messages")
+        
         # Create a new session ID for the current user
         timestamp = datetime.now().strftime("%Y%m%d")
         random_id = str(uuid.uuid4())[:10]
         new_session_id = f"cf.conversation.{timestamp}.{random_id}"
+        
+        # Smart title generation with share counter
+        original_title = original_session['title']
+        
+        # Check if title already has "Shared (N):" pattern
+        shared_pattern = r'^Shared \((\d+)\):\s*(.+)$'
+        match = re.match(shared_pattern, original_title)
+        
+        if match:
+            # Title already has a counter, increment it
+            current_count = int(match.group(1))
+            clean_title = match.group(2)
+            new_title = f"Shared ({current_count + 1}): {clean_title}"
+        elif original_title.startswith("Shared: "):
+            # Title has "Shared:" but no counter, make it (2)
+            clean_title = original_title[8:]  # Remove "Shared: " prefix
+            new_title = f"Shared (2): {clean_title}"
+        else:
+            # Original chat, first share
+            new_title = f"Shared: {original_title}"
+        
+        print(f"[SHARE] Title: '{original_title}' → '{new_title}'")
         
         # Copy session to current user
         new_session_data = {
@@ -2433,28 +2490,38 @@ async def get_shared_chat_session(
             "user_id": auth_user["user_id"],
             "user_email": auth_user["email"],
             "user_name": auth_user["name"],
-            "title": f"Shared: {original_session['title']}",
+            "title": new_title,
             "created_at": int(datetime.now().timestamp() * 1000),
             "updated_at": int(datetime.now().timestamp() * 1000),
             "messages": original_session.get("messages", []),
             "message_count": len(original_session.get("messages", []))
+            # NOTE: source_share_token and source_session_id commented out
+            # Uncomment these when enabling duplicate prevention:
+            # "source_share_token": share_token,  # Track which share token this came from
+            # "source_session_id": shared_chat["session_id"]  # Track original session
         }
         
         # Save the copied session
         await save_session(new_session_data)
         
+        print(f"[SHARE] Created new copy for user {auth_user['email']}: {new_session_id}")
+        
         return {
             "session_id": new_session_id,
             "title": new_session_data["title"],
             "messages": new_session_data["messages"],
+            "created_at": new_session_data["created_at"],
+            "updated_at": new_session_data["updated_at"],
             "original_owner": shared_chat["user_email"],
-            "message": "Chat copied successfully to your chats"
+            "message": "Chat copied successfully to your chats",
+            "is_existing": False  # Flag to indicate this is a new copy
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        return {"error": str(e)}
+        print(f"[SHARE] ❌ Error retrieving shared chat: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve shared chat: {str(e)}")
 
 # ---------------- Feedback Endpoint ----------------
 
@@ -3266,6 +3333,9 @@ class MicrosoftCallbackRequest(BaseModel):
     redirect_uri: str
     code_verifier: str
 
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
+
 @router.get("/test")
 async def test_endpoint():
     """Test endpoint to verify backend connectivity."""
@@ -3283,6 +3353,80 @@ async def get_auth_config():
 async def test_post_endpoint(data: dict):
     """Test POST endpoint to verify CORS and connectivity."""
     return {"message": "POST request received", "data": data, "status": "success"}
+
+@router.post("/auth/microsoft/refresh")
+async def refresh_microsoft_token(request: TokenRefreshRequest):
+    """
+    Refresh Microsoft OAuth access token using refresh token.
+    
+    SECURITY: Backend owns all OAuth credentials.
+    Frontend only provides the refresh_token.
+    """
+    try:
+        # Backend owns these secrets
+        tenant = MICROSOFT_TENANT
+        client_id = MICROSOFT_CLIENT_ID
+        client_secret = MICROSOFT_CLIENT_SECRET
+        
+        token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+        
+        token_data = {
+            "client_id": client_id,
+            "client_secret": client_secret,  # Never exposed to frontend
+            "refresh_token": request.refresh_token,
+            "grant_type": "refresh_token",
+            "scope": "openid email profile User.Read"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(token_url, data=token_data, timeout=30.0)
+            
+            if token_response.status_code != 200:
+                logger.error(f"Token refresh failed: {token_response.status_code}")
+                # Log but don't expose full error details to frontend
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token refresh failed"
+                )
+            
+            token_info = token_response.json()
+            
+            # Validate CloudFuze domain again (defense in depth)
+            async with httpx.AsyncClient() as graph_client:
+                user_response = await graph_client.get(
+                    "https://graph.microsoft.com/v1.0/me",
+                    headers={"Authorization": f"Bearer {token_info.get('access_token')}"},
+                    timeout=10.0
+                )
+                
+                if user_response.status_code == 200:
+                    user_info = user_response.json()
+                    user_email = user_info.get("mail") or user_info.get("userPrincipalName", "")
+                    
+                    if not user_email.endswith("@cloudfuze.com"):
+                        logger.warning(f"Refresh attempt from non-CloudFuze email: {user_email}")
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Access denied"
+                        )
+            
+            logger.info(f"Token refreshed successfully")
+            
+            return {
+                "access_token": token_info.get("access_token"),
+                "refresh_token": token_info.get("refresh_token"),
+                "expires_in": token_info.get("expires_in", 3600),
+                "token_type": token_info.get("token_type", "Bearer")
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Token refresh error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Token refresh failed"
+        )
 
 @router.post("/auth/microsoft/callback")
 async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
@@ -3346,7 +3490,8 @@ async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
                 "name": user_name,
                 "email": user_email,
                 "access_token": access_token,
-                "refresh_token": token_info.get("refresh_token", "")
+                "refresh_token": token_info.get("refresh_token", ""),
+                "expires_in": token_info.get("expires_in", 3600)  # Token lifetime in seconds
             }
             
             return result

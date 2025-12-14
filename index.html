@@ -76,6 +76,29 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    /* Token refresh notification animations */
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
     
     html {
       scrollbar-gutter: stable;
@@ -1173,6 +1196,13 @@
           return;
         }
         
+        // Ensure token is valid before API call
+        const tokenCheck = await ensureValidToken();
+        if (!tokenCheck.isValid) {
+          console.error('[FEEDBACK] Token invalid, cannot submit feedback');
+          return;
+        }
+        
         // Send feedback to backend
         const response = await fetch(`${apiBase}/feedback`, {
           method: "POST",
@@ -1468,6 +1498,13 @@
         return;
       }
       
+      // Ensure token is valid before API call
+      const tokenCheck = await ensureValidToken();
+      if (!tokenCheck.isValid) {
+        console.error('[EDIT] Token invalid, cannot update history');
+        return;
+      }
+      
       try {
         // Collect all messages up to (but not including) the edited one
         const messagesToKeep = [];
@@ -1577,6 +1614,20 @@
           localStorage.removeItem('user');
           window.location.href = "login.html";
           return;
+        }
+        
+        // Ensure token is valid, refresh if needed
+        const tokenCheck = await ensureValidToken();
+        if (!tokenCheck.isValid) {
+          console.error("[CHAT] Token invalid or refresh failed, redirecting to login");
+          localStorage.removeItem('user');
+          window.location.href = "login.html?error=session_expired";
+          return;
+        }
+        
+        // Update currentUser if token was refreshed
+        if (tokenCheck.user) {
+          currentUser = tokenCheck.user;
         }
         
         const requestBody = { question };
@@ -1745,16 +1796,20 @@
     async function startNewConversation() {
       console.log('[NEW_CHAT] Starting new conversation - clearing messages');
       if (currentUser && currentUser.id && currentUser.access_token) {
-        // Clear user's chat history on server
-        try {
-          await fetch(`${getApiBase()}/chat/history/${currentUser.id}`, {
-            method: "DELETE",
-            headers: {
-              'Authorization': `Bearer ${currentUser.access_token}`
-            }
-          });
-        } catch (error) {
-          console.error('Failed to clear chat history:', error);
+        // Ensure token is valid before API call
+        const tokenCheck = await ensureValidToken();
+        if (tokenCheck.isValid) {
+          // Clear user's chat history on server
+          try {
+            await fetch(`${getApiBase()}/chat/history/${currentUser.id}`, {
+              method: "DELETE",
+              headers: {
+                'Authorization': `Bearer ${currentUser.access_token}`
+              }
+            });
+          } catch (error) {
+            console.error('Failed to clear chat history:', error);
+          }
         }
       }
       
@@ -1911,16 +1966,20 @@
     // Permanently delete chat
     async function permanentlyDeleteChat() {
       if (currentUser && currentUser.id && currentUser.access_token) {
-        // Clear user's chat history on server
-        try {
-          await fetch(`${getApiBase()}/chat/history/${currentUser.id}`, {
-            method: "DELETE",
-            headers: {
-              'Authorization': `Bearer ${currentUser.access_token}`
-            }
-          });
-        } catch (error) {
-          console.error('Failed to clear chat history:', error);
+        // Ensure token is valid before API call
+        const tokenCheck = await ensureValidToken();
+        if (tokenCheck.isValid) {
+          // Clear user's chat history on server
+          try {
+            await fetch(`${getApiBase()}/chat/history/${currentUser.id}`, {
+              method: "DELETE",
+              headers: {
+                'Authorization': `Bearer ${currentUser.access_token}`
+              }
+            });
+          } catch (error) {
+            console.error('Failed to clear chat history:', error);
+          }
         }
       }
       
@@ -2050,7 +2109,9 @@
             name: data.name,
             email: data.email,
             access_token: data.access_token,
-            refresh_token: data.refresh_token
+            refresh_token: data.refresh_token,
+            expires_in: data.expires_in || 3600, // Default 1 hour
+            token_expires_at: Date.now() + ((data.expires_in || 3600) * 1000) // Timestamp when token expires
           };
           
           console.log('[AUTH] Created user object:', user);
@@ -2207,6 +2268,140 @@
       }
     }
 
+    // Show token refresh notification
+    function showTokenRefreshNotification() {
+      const notification = document.createElement('div');
+      notification.id = 'token-refresh-notification';
+      notification.style.cssText = `
+        position: fixed;
+        top: 70px;
+        right: 20px;
+        background: rgba(1, 41, 172, 0.95);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 9999;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        animation: slideIn 0.3s ease-out;
+      `;
+      notification.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM4 8a4 4 0 1 1 8 0 4 4 0 0 1-8 0z"/>
+          <path d="M7.5 5.5a.5.5 0 0 1 1 0v2.293l1.354 1.353a.5.5 0 0 1-.708.708l-1.5-1.5A.5.5 0 0 1 7.5 8V5.5z"/>
+        </svg>
+        Refreshing session...
+      `;
+      document.body.appendChild(notification);
+      
+      // Remove after 2 seconds
+      setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => notification.remove(), 300);
+      }, 2000);
+    }
+
+    // Refresh access token using refresh token
+    async function refreshAccessToken() {
+      try {
+        console.log('[TOKEN_REFRESH] Starting token refresh...');
+        
+        // Show notification
+        showTokenRefreshNotification();
+        
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        
+        if (!user || !user.refresh_token) {
+          console.error('[TOKEN_REFRESH] No refresh token available');
+          return { success: false, reason: 'no_refresh_token' };
+        }
+        
+        const response = await fetch(`${getApiBase()}/auth/microsoft/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            refresh_token: user.refresh_token
+          })
+        });
+        
+        if (!response.ok) {
+          console.error('[TOKEN_REFRESH] Failed:', response.status);
+          return { success: false, reason: 'refresh_failed' };
+        }
+        
+        const data = await response.json();
+        
+        // Update user with new tokens
+        const updatedUser = {
+          ...user,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || user.refresh_token, // Keep old if not provided
+          expires_in: data.expires_in || 3600,
+          token_expires_at: Date.now() + ((data.expires_in || 3600) * 1000)
+        };
+        
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        currentUser = updatedUser;
+        
+        console.log('[TOKEN_REFRESH] ✅ Token refreshed successfully. Expires in:', data.expires_in, 'seconds');
+        
+        return { success: true, user: updatedUser };
+        
+      } catch (error) {
+        console.error('[TOKEN_REFRESH] Error:', error);
+        return { success: false, reason: 'error', error };
+      }
+    }
+
+    // Check if token needs refresh and refresh if necessary
+    async function ensureValidToken() {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        
+        if (!user || !user.access_token) {
+          console.log('[TOKEN_CHECK] No user found');
+          return { isValid: false, reason: 'no_user' };
+        }
+        
+        // Check if we have token_expires_at
+        if (!user.token_expires_at) {
+          console.log('[TOKEN_CHECK] No expiration time stored, assuming valid');
+          return { isValid: true, user };
+        }
+        
+        const now = Date.now();
+        const timeUntilExpiry = user.token_expires_at - now;
+        const minutesUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60));
+        
+        console.log('[TOKEN_CHECK] Token expires in:', minutesUntilExpiry, 'minutes');
+        
+        // Refresh if token expires in less than 5 minutes
+        if (timeUntilExpiry < 5 * 60 * 1000) {
+          console.log('[TOKEN_CHECK] Token expiring soon, refreshing...');
+          const refreshResult = await refreshAccessToken();
+          
+          if (refreshResult.success) {
+            return { isValid: true, user: refreshResult.user };
+          } else {
+            console.error('[TOKEN_CHECK] Refresh failed:', refreshResult.reason);
+            return { isValid: false, reason: 'refresh_failed' };
+          }
+        }
+        
+        console.log('[TOKEN_CHECK] ✅ Token is valid');
+        return { isValid: true, user };
+        
+      } catch (error) {
+        console.error('[TOKEN_CHECK] Error:', error);
+        return { isValid: false, reason: 'error', error };
+      }
+    }
+
     // Update user info in header
     function updateUserInfo(user) {
       const userName = document.getElementById('userName');
@@ -2255,6 +2450,13 @@
         const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
         if (!currentUser || !currentUser.access_token) {
           console.error('[HISTORY] User not authenticated');
+          return;
+        }
+        
+        // Ensure token is valid before API call
+        const tokenCheck = await ensureValidToken();
+        if (!tokenCheck.isValid) {
+          console.error('[HISTORY] Token invalid, cannot load history');
           return;
         }
         
@@ -2363,6 +2565,17 @@
     }
 
     initAuth();
+
+    // Start background token refresh timer (check every 2 minutes)
+    setInterval(async () => {
+      if (currentUser && currentUser.access_token) {
+        console.log('[TOKEN_MONITOR] Periodic token check...');
+        const tokenCheck = await ensureValidToken();
+        if (!tokenCheck.isValid) {
+          console.warn('[TOKEN_MONITOR] Token invalid, user will need to re-login on next action');
+        }
+      }
+    }, 2 * 60 * 1000); // Every 2 minutes
 
     // Event listeners
     document.getElementById('newChatBtn').addEventListener('click', handleNewChat);

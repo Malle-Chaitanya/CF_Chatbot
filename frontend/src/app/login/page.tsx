@@ -143,6 +143,14 @@ function initializeLoginPage() {
     sessionStorage.removeItem('code_verifier');
     localStorage.removeItem('user');
     
+    // Save redirect URL before starting OAuth
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUrl = urlParams.get('redirect');
+    if (redirectUrl) {
+      sessionStorage.setItem('oauth_redirect', redirectUrl);
+      console.log('[AUTH] Saved redirect URL:', redirectUrl);
+    }
+    
     const button = event.target as HTMLButtonElement;
     const originalText = button.innerHTML;
     button.innerHTML = '<span>Signing in...</span>';
@@ -323,23 +331,31 @@ function initializeLoginPage() {
         sessionStorage.removeItem('code_verifier');
         sessionStorage.removeItem('login_in_progress');
         
+        // Calculate and store token expiration
+        const expiresIn = data.expires_in || 3600; // Default 1 hour
+        const expiresAt = Date.now() + (expiresIn * 1000);
+        
         const user = {
           id: data.user_id,
           name: data.name,
           email: data.email,
           access_token: data.access_token,
-          refresh_token: data.refresh_token
+          refresh_token: data.refresh_token,
+          token_expires_at: expiresAt,      // Phase 2.1: Token expiration tracking
+          token_issued_at: Date.now()       // Phase 2.1: Token issued timestamp
         };
         
         localStorage.setItem('user', JSON.stringify(user));
-        // Clear URL parameters before redirecting
-        window.history.replaceState({}, document.title, window.location.pathname);
+        console.log('[AUTH] Token expires in', Math.round(expiresIn / 60), 'minutes');
         
-        // Get redirect URL from query params, default to home
-        const urlParams = new URLSearchParams(window.location.search);
-        const redirectUrl = urlParams.get('redirect') || '/';
+        // Get redirect URL from sessionStorage (saved before OAuth)
+        const redirectUrl = sessionStorage.getItem('oauth_redirect') || '/';
+        sessionStorage.removeItem('oauth_redirect');  // Clean up
         
         console.log('[AUTH] Login successful, redirecting to:', redirectUrl);
+        
+        // Clear URL parameters before redirecting
+        window.history.replaceState({}, document.title, window.location.pathname);
         
         // Redirect to the intended page
         window.location.href = redirectUrl;

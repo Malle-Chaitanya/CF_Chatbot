@@ -19,6 +19,21 @@ interface InitOptions {
 let isAppInitialized = false;
 let currentInitializedSessionId: string | null = null;
 
+// ============================================================================
+// PHASE 2.5: Parallel Chat Generation (Frontend-Managed)
+// ============================================================================
+// Architecture: Each chat session owns its own generation state
+// - Multiple chats can generate simultaneously
+// - Switching sessions does NOT abort ongoing generation
+// - UI state (disabled buttons) is scoped to ACTIVE session only
+// - Backend receives independent requests per session
+// ============================================================================
+
+// Per-session generation state (NOT global)
+const generatingStatus = new Map<string, boolean>();
+// ✅ PHASE 2.5.4: Removed activeRequests - streams complete independently
+// const activeRequests = new Map<string, AbortController>();
+
 export function initializeChatApp(options: InitOptions = {}) {
   const { router, initialSessionId, preloadedSession } = options;
   
@@ -33,6 +48,12 @@ export function initializeChatApp(options: InitOptions = {}) {
   
   if (isSwitchingSession) {
     console.log('[CHAT] Switching session from', currentInitializedSessionId, 'to', initialSessionId);
+    
+    // ✅ PHASE 2.5: DO NOT abort previous session's request
+    // Allow multiple chats to generate in parallel
+    // The previous session continues generating in the background
+    // UI state is scoped to active session only (see updateUIForActiveSession)
+    console.log('[CHAT] Previous session continues generating in background');
   }
   
   // API Base URL configuration
@@ -65,28 +86,38 @@ export function initializeChatApp(options: InitOptions = {}) {
   const sendBtnEmptyState = document.getElementById("send-btn-empty") as HTMLButtonElement;
   const inputSection = document.querySelector(".chatgpt-input-section") as HTMLElement;
 
-  // Flag to prevent multiple simultaneous requests
-  let isGenerating = false;
+  // Helper function to check if a specific session is generating
+  function isSessionGenerating(sid: string): boolean {
+    return generatingStatus.get(sid) === true;
+  }
 
-  // Helper function to disable/enable send buttons during generation
-  function setGeneratingState(generating: boolean) {
-    isGenerating = generating;
+  // Helper function to set generating state for a specific session
+  function setSessionGenerating(sid: string, generating: boolean) {
+    generatingStatus.set(sid, generating);
+    updateUIForActiveSession();
+  }
+
+  // ✅ CORRECTION 1: UI updates only affect the active session
+  // This prevents blocking all chats when one is generating
+  function updateUIForActiveSession() {
+    const isActiveGenerating = activeSessionId ? isSessionGenerating(activeSessionId) : false;
+    
     const buttons = [sendBtn, sendBtnEmptyState];
     const inputs = [input, inputEmptyState];
     
     buttons.forEach(btn => {
       if (btn) {
-        btn.disabled = generating;
-        btn.style.opacity = generating ? '0.5' : '1';
-        btn.style.cursor = generating ? 'not-allowed' : 'pointer';
-        btn.title = generating ? 'Response is generating...' : 'Send message';
+        btn.disabled = isActiveGenerating;
+        btn.style.opacity = isActiveGenerating ? '0.5' : '1';
+        btn.style.cursor = isActiveGenerating ? 'not-allowed' : 'pointer';
+        btn.title = isActiveGenerating ? 'Response is generating...' : 'Send message';
       }
     });
     
     inputs.forEach(inp => {
       if (inp) {
-        inp.disabled = generating;
-        inp.style.opacity = generating ? '0.7' : '1';
+        inp.disabled = isActiveGenerating;
+        inp.style.opacity = isActiveGenerating ? '0.7' : '1';
       }
     });
   }
@@ -440,20 +471,38 @@ export function initializeChatApp(options: InitOptions = {}) {
   
   // Save current session
   function saveCurrentSession(title?: string) {
+    // ✅ FIX 3: Guard against saving inactive sessions from DOM
+    // DOM only represents the currently active chat, not background chats
+    if (!sessionId) {
+      console.log('[SESSION SAVE] ⏭️ Skipping save — no active session');
+      return;
+    }
+    
     const sessions = getAllSessions();
-    const messages = Array.from(messagesDiv!.children).map((child, index) => {
-      const isUser = child.classList.contains('user-message-wrapper') || 
-                     child.querySelector('.message.user');
-      
-      if (isUser) {
-        const content = (child.querySelector('.message.user') as HTMLElement)?.textContent || '';
-        return {
-          role: 'user',
-          content: content
-        };
-      } else {
-        // Bot message - capture content and recommended questions
-        const messageContentDiv = child.querySelector('.message-content') as HTMLElement;
+    const messages = Array.from(messagesDiv!.children)
+      .map((child, index) => {
+        const isUser = child.classList.contains('user-message-wrapper') || 
+                       child.querySelector('.message.user');
+        
+        if (isUser) {
+          const content = (child.querySelector('.message.user') as HTMLElement)?.textContent || '';
+          return {
+            role: 'user',
+            content: content
+          };
+        } else {
+          /* ================================
+             PHASE 2.5.3 – STREAM-SAFE PERSISTENCE
+             Skip messages that are still streaming to prevent partial content overwrites
+             ================================ */
+          if ((child as HTMLElement).dataset.generating === 'true') {
+            console.log('[SESSION SAVE] ⏭️ Skipping in-progress bot message');
+            return null; // Skip this message
+          }
+          /* ================================ */
+          
+          // Bot message - capture content and recommended questions
+          const messageContentDiv = child.querySelector('.message-content') as HTMLElement;
         const content = messageContentDiv?.innerHTML || '';
         const traceId = (child as HTMLElement).dataset.traceId || undefined;
         const feedbackSubmitted = (child as HTMLElement).dataset.feedbackSubmitted === 'true';
@@ -490,7 +539,8 @@ export function initializeChatApp(options: InitOptions = {}) {
         
         return result;
       }
-    });
+    })
+    .filter(msg => msg !== null); // 🔒 PHASE 2.5.3: Remove skipped generating messages
     
     if (messages.length === 0) return;
     
@@ -533,6 +583,54 @@ export function initializeChatApp(options: InitOptions = {}) {
     
     // Sync session metadata to backend
     syncSessionToBackend(sessionData);
+  }
+  
+  // Save a session that completed generation in the background (not currently displayed)
+  function saveCompletedBackgroundSession(completedSessionId: string, botDiv: HTMLElement) {
+    console.log('[SESSION SYNC] Saving completed background session:', completedSessionId);
+    
+    const sessions = getAllSessions();
+    const sessionIndex = sessions.findIndex(s => s.id === completedSessionId);
+    
+    if (sessionIndex === -1) {
+      console.error('[SESSION SYNC] ❌ Session not found:', completedSessionId);
+      return;
+    }
+    
+    // Extract completed message data from botDiv
+    const contentDiv = botDiv.querySelector('.message-content') as HTMLElement;
+    const content = contentDiv?.innerHTML || '';
+    const traceId = botDiv.dataset.traceId;
+    const recommendedQuestionsDiv = botDiv.querySelector('.recommended-questions');
+    const recommendedQuestions: string[] = [];
+    
+    // Extract recommended questions if present
+    if (recommendedQuestionsDiv) {
+      const questionBtns = recommendedQuestionsDiv.querySelectorAll('.recommended-question-btn');
+      questionBtns.forEach(btn => {
+        const question = btn.getAttribute('data-question');
+        if (question) recommendedQuestions.push(question);
+      });
+    }
+    
+    // Add completed message to session
+    sessions[sessionIndex].messages.push({
+      role: 'assistant',
+      content: content,
+      traceId: traceId,
+      recommendedQuestions: recommendedQuestions.length > 0 ? recommendedQuestions : undefined
+    });
+    
+    // Update timestamp
+    sessions[sessionIndex].timestamp = Date.now();
+    
+    // Save to storage
+    saveAllSessions(sessions);
+    
+    console.log('[SESSION SYNC] ✅ Successfully synced background session, message count:', sessions[sessionIndex].messages.length);
+    
+    // Sync to backend
+    syncSessionToBackend(sessions[sessionIndex]);
   }
   
   // Sync session metadata to backend
@@ -796,7 +894,28 @@ export function initializeChatApp(options: InitOptions = {}) {
   
   // Share chat functionality
   async function shareChat() {
+    // Get share button reference
+    const shareButton = document.querySelector('.share-button') as HTMLButtonElement;
+    const shareButtonSpan = shareButton?.querySelector('span');
+    const originalButtonText = shareButtonSpan?.textContent || 'Share';
+    
     try {
+      // Show loading state
+      if (shareButton) {
+        shareButton.disabled = true;
+        shareButton.style.opacity = '0.6';
+        shareButton.style.cursor = 'not-allowed';
+      }
+      if (shareButtonSpan) {
+        shareButtonSpan.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite; display: inline-block; margin-right: 4px;">
+            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+            <path d="M12 2 A10 10 0 0 1 22 12" stroke-opacity="0.75"></path>
+          </svg>
+          Sharing...
+        `;
+      }
+      
       if (!sessionId) {
         showToast('No active chat session to share', 'error', 3000);
         console.warn('[SHARE] No session ID available');
@@ -886,6 +1005,16 @@ export function initializeChatApp(options: InitOptions = {}) {
     } catch (error) {
       console.error('[SHARE] Failed to share chat:', error);
       showToast('Failed to create share link. Please try again.', 'error', 4000);
+    } finally {
+      // Restore button state
+      if (shareButton) {
+        shareButton.disabled = false;
+        shareButton.style.opacity = '1';
+        shareButton.style.cursor = 'pointer';
+      }
+      if (shareButtonSpan) {
+        shareButtonSpan.textContent = originalButtonText;
+      }
     }
   }
   
@@ -1471,26 +1600,49 @@ export function initializeChatApp(options: InitOptions = {}) {
         });
         sessionEl.classList.add('active');
         
-        if (isOthers) {
-          // For others' chats, navigate to others route
-          if (router) {
-            router.push(`/chat/others/${sid}`);
-          } else {
-            // Fallback if router not available
-            loadOthersSession(sid!);
-          }
-        } else {
-          // For own chats, navigate to chat route
-          if (router) {
-            router.push(`/chat/${sid}`);
-          } else {
-            // Fallback if router not available
-            const session = sessions.find(s => s.id === sid);
-            if (session) {
-              loadSession(session, false);
+        /* =====================================================
+           PHASE 2.5.2 – MANUAL SAVE BEFORE SESSION SWITCH
+           
+           Since we bypass router.push() to avoid page reload,
+           we must manually trigger saveCurrentSession() here.
+           
+           This is Fix #2 from Phase 2.5.1, re-implemented for
+           client-side-only navigation architecture.
+           ===================================================== */
+        
+        // Save current session before switching (critical for data integrity)
+        // ✅ FIX 1: Only save if session is not generating
+        if (sessionId && typeof saveCurrentSession === 'function') {
+          try {
+            if (!isSessionGenerating(sessionId)) {
+              saveCurrentSession();
+              console.log('[SIDEBAR] ✅ Saved completed session before switch:', sessionId);
+            } else {
+              console.log('[SIDEBAR] ⏭️ Skip save — session still generating:', sessionId);
             }
+          } catch (err) {
+            console.error('[SIDEBAR] ❌ Failed to save before switch:', err);
           }
         }
+        
+        /* ===================================================== */
+        
+        // Now perform client-side session switch
+        if (isOthers) {
+          // Client-side load only, no navigation
+          loadOthersSession(sid!);
+          // Update URL passively (for deep linking and browser history)
+          window.history.pushState({}, '', `/chat/others/${sid}`);
+        } else {
+          // Client-side load only, no navigation
+          const session = sessions.find(s => s.id === sid);
+          if (session) {
+            loadSession(session, false);
+            // Update URL passively (for deep linking and browser history)
+            window.history.pushState({}, '', `/chat/${sid}`);
+          }
+        }
+        /* ===================================================== */
       });
     });
     
@@ -2007,8 +2159,8 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
 
   async function sendMessage() {
-    // Prevent multiple simultaneous requests
-    if (isGenerating) return;
+    // ✅ PHASE-1: Check per-session state instead of global
+    if (!sessionId || isSessionGenerating(sessionId)) return;
     
     const question = input.value.trim();
     if (!question) return;
@@ -2044,8 +2196,19 @@ export function initializeChatApp(options: InitOptions = {}) {
     // This shows the new chat in sidebar right away
     updateSidebarImmediately();
     
-    // Save session after user message (saves to localStorage synchronously)
+    /* ================================
+       PHASE 2.5.1 – CRITICAL FIX #1
+       Persist user message immediately to localStorage BEFORE starting backend request
+       
+       This ensures user input is durable even if:
+       - User switches sessions before bot responds
+       - Page refreshes mid-generation
+       - Any other interruption occurs
+       
+       User intent must be saved the moment Send is pressed, not when bot responds.
+       ================================ */
     saveCurrentSession();
+    /* ================================ */
     
     await sendMessageText(question);
   }
@@ -2053,13 +2216,25 @@ export function initializeChatApp(options: InitOptions = {}) {
   async function sendMessageText(question: string) {
     if (!question) return;
     
-    // Prevent multiple simultaneous requests
-    if (isGenerating) return;
+    // ✅ PHASE-1: Check per-session state instead of global
+    if (!sessionId || isSessionGenerating(sessionId)) return;
+    
+    // ✅ PHASE 2.5.4: Removed AbortController - streams complete independently
+    // This allows background streams to finish even when navigating to /chat/new
+    // Streams are no longer tied to component lifecycle
     
     // Disable send buttons while generating
-    setGeneratingState(true);
+    setSessionGenerating(sessionId, true);
 
     const botDiv = addMessageHTML("", "bot", null);
+    
+    /* ================================
+       PHASE 2.5.3 – STREAM-SAFE PERSISTENCE
+       Mark message as generating to prevent partial saves during session switches
+       ================================ */
+    botDiv.dataset.generating = 'true';
+    botDiv.dataset.sessionId = sessionId;
+    /* ================================ */
     
     // Status update function - simplified for better performance
     let isStreamingStatus = false;
@@ -2105,18 +2280,33 @@ export function initializeChatApp(options: InitOptions = {}) {
         return;
       }
       
+      // ✅ PHASE 3: Ensure token is valid before API call
+      const { ensureValidToken } = await import('@/lib/session-utils');
+      const tokenValid = await ensureValidToken();
+      if (!tokenValid) {
+        console.error("[CHAT] Token invalid or refresh failed, redirecting to login");
+        localStorage.removeItem('user');
+        window.location.href = "/login?error=session_expired";
+        return;
+      }
+      
+      // Get updated user after potential token refresh
+      const refreshedUser = JSON.parse(localStorage.getItem('user') || 'null');
+      
       const requestBody = { 
         question,
         session_id: sessionId
       };
       
+      // ✅ PHASE 2.5.4: Removed signal - streams complete independently of navigation
       const response = await fetch(`${getApiBase()}/chat/stream`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${currentUser.access_token}`
+          "Authorization": `Bearer ${refreshedUser.access_token}`
         },
         body: JSON.stringify(requestBody),
+        // No signal - allows streams to complete even when user navigates away
       });
 
       if (response.status === 401 || response.status === 403) {
@@ -2138,6 +2328,9 @@ export function initializeChatApp(options: InitOptions = {}) {
       const renderThrottle = 16;
 
       while (true) {
+        // ✅ PHASE 2.5.4: Removed abort check - streams complete independently
+        // Streams now run to completion regardless of navigation
+        
         const { done, value } = await reader.read();
         if (done) break;
         
@@ -2283,7 +2476,7 @@ export function initializeChatApp(options: InitOptions = {}) {
                     // This updates the URL without triggering Next.js route change or page reload
                     // We use a longer delay to ensure streaming is completely finished
                     setTimeout(() => {
-                      if (typeof window !== 'undefined' && window.history && !isGenerating) {
+                      if (typeof window !== 'undefined' && window.history && !isSessionGenerating(sessionId!)) {
                         try {
                           // Update browser URL without navigation
                           // This should NOT trigger Next.js route change
@@ -2306,8 +2499,42 @@ export function initializeChatApp(options: InitOptions = {}) {
                   }
                 }
                 
+                // ✅ PHASE-1: Clean up after successful completion
                 // Re-enable send buttons after response complete
-                setGeneratingState(false);
+                setSessionGenerating(sessionId!, false);
+                
+                /* ================================
+                   PHASE 2.5.3 FINAL FIX – STREAM-SAFE PERSISTENCE
+                   Mark message as complete and save the CORRECT session
+                   
+                   CRITICAL: Check if this is the currently displayed session
+                   or a background session. If background, we must load that
+                   specific session from storage and append the completed message.
+                   ================================ */
+                botDiv.dataset.generating = 'false';
+                
+                // Check which session this message belongs to
+                const completedSessionId = botDiv.dataset.sessionId;
+                
+                // ✅ FIX 2: CRITICAL - Clear generating flag for the completed session
+                // This prevents UI freezing and allows the session to receive new messages
+                if (completedSessionId) {
+                  setSessionGenerating(completedSessionId, false);
+                }
+                
+                if (completedSessionId === sessionId) {
+                  // Still on this session - save normally from DOM
+                  saveCurrentSession();
+                  console.log('[STREAM] ✅ Auto-saved current session after generation complete');
+                } else if (completedSessionId) {
+                  // Different session - save the background session from storage
+                  saveCompletedBackgroundSession(completedSessionId, botDiv);
+                  console.log('[STREAM] ✅ Auto-saved background session:', completedSessionId);
+                } else {
+                  console.warn('[STREAM] ⚠️ No sessionId found on botDiv, falling back to current session save');
+                  saveCurrentSession();
+                }
+                /* ================================ */
                 
                 return;
               } else if (data.type === 'error') {
@@ -2323,8 +2550,38 @@ export function initializeChatApp(options: InitOptions = {}) {
     } catch (error) {
       console.error("Error sending message:", error);
       botDiv.innerHTML = "Sorry, there was an error. Please try again.";
+      
+      // ✅ CORRECTION 2: Always clean up on error
       // Re-enable send buttons after error
-      setGeneratingState(false);
+      setSessionGenerating(sessionId!, false);
+      
+      /* ================================
+         PHASE 2.5.3 FINAL FIX – STREAM-SAFE PERSISTENCE
+         Mark message as complete and save the CORRECT session even on error
+         ================================ */
+      botDiv.dataset.generating = 'false';
+      
+      // Check which session this message belongs to
+      const completedSessionId = botDiv.dataset.sessionId;
+      
+      // ✅ FIX 2 (Error Handler): Clear generating flag for the completed session
+      if (completedSessionId) {
+        setSessionGenerating(completedSessionId, false);
+      }
+      
+      if (completedSessionId === sessionId) {
+        // Still on this session - save normally from DOM
+        saveCurrentSession();
+        console.log('[STREAM] ✅ Auto-saved current session after error');
+      } else if (completedSessionId) {
+        // Different session - save the background session from storage
+        saveCompletedBackgroundSession(completedSessionId, botDiv);
+        console.log('[STREAM] ✅ Auto-saved background session after error:', completedSessionId);
+      } else {
+        console.warn('[STREAM] ⚠️ No sessionId found on botDiv after error, falling back to current session save');
+        saveCurrentSession();
+      }
+      /* ================================ */
     }
   }
 
@@ -2378,8 +2635,8 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
 
   function askRecommendedQuestion(button: HTMLElement) {
-    // Prevent multiple simultaneous requests
-    if (isGenerating) return;
+    // ✅ PHASE-1: Check per-session state
+    if (!sessionId || isSessionGenerating(sessionId)) return;
     
     const question = button.getAttribute('data-question');
     if (question) {
@@ -2998,8 +3255,8 @@ export function initializeChatApp(options: InitOptions = {}) {
   }
 
   function saveEdit(button: HTMLElement) {
-    // Prevent multiple simultaneous requests
-    if (isGenerating) return;
+    // ✅ PHASE-1: Check per-session state
+    if (!sessionId || isSessionGenerating(sessionId)) return;
     
     const wrapper = button.closest('.user-message-wrapper');
     if (!wrapper) return;
@@ -3209,6 +3466,35 @@ export function initializeChatApp(options: InitOptions = {}) {
       // If switching sessions, skip full reload and only reload session data
       if (isSwitchingSession) {
         console.log('[CHAT] Session switch detected - reloading only session data');
+        
+        /* ================================
+           PHASE 2.5.1 – CRITICAL FIX #2
+           Save current session before switching away to prevent data loss
+           
+           At this point:
+           - currentInitializedSessionId = OLD session ID (still in DOM)
+           - sessionId = NEW session ID (from URL)
+           - DOM still contains OLD session's messages
+           
+           We need to save the OLD session before loading the NEW session
+           ================================ */
+        try {
+          const newSessionId = sessionId;  // Save the new session ID
+          sessionId = currentInitializedSessionId;  // Temporarily restore old session ID
+          
+          // Now saveCurrentSession() will use the correct (old) session ID
+          // It reads messages from DOM (which still has old session's messages)
+          // and saves them with the old session ID
+          if (typeof saveCurrentSession === 'function') {
+            saveCurrentSession();
+            console.log('[CHAT] ✅ Saved previous session before switch:', currentInitializedSessionId);
+          }
+          
+          sessionId = newSessionId;  // Restore new session ID for upcoming logic
+        } catch (err) {
+          console.error('[CHAT] Failed to save session before switch:', err);
+        }
+        /* ================================ */
         
         // Update sidebar active state (lightweight, no re-render)
         updateSidebarActiveState(initialSessionId || null);
@@ -3574,8 +3860,8 @@ export function initializeChatApp(options: InitOptions = {}) {
   // Event listeners for empty state input (center)
   if (sendBtnEmptyState) {
     sendBtnEmptyState.addEventListener("click", () => {
-      // Prevent multiple simultaneous requests
-      if (isGenerating) return;
+      // ✅ PHASE-1: Check per-session state
+      if (!sessionId || isSessionGenerating(sessionId)) return;
       
       if (inputEmptyState) {
         const question = inputEmptyState.value.trim();
@@ -3667,8 +3953,8 @@ export function initializeChatApp(options: InitOptions = {}) {
   const suggestedQuestionBtns = document.querySelectorAll('.suggested-question-btn');
   suggestedQuestionBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
-      // Prevent multiple simultaneous requests
-      if (isGenerating) return;
+      // ✅ PHASE-1: Check per-session state
+      if (!sessionId || isSessionGenerating(sessionId)) return;
       
       const button = e.target as HTMLButtonElement;
       const question = button.getAttribute('data-question');

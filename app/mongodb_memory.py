@@ -441,6 +441,39 @@ class MongoDBMemoryManager:
         except Exception as e:
             logger.error(f"Error getting shared chat {share_token}: {e}")
             return None
+    
+    async def find_session_by_share_token(self, user_id: str, share_token: str) -> Optional[Dict]:
+        """Find if user already has a copy from this share token."""
+        await self.connect()
+        
+        try:
+            sessions_collection = self.database["chat_sessions"]
+            doc = await sessions_collection.find_one({
+                "user_id": user_id,
+                "source_share_token": share_token
+            })
+            
+            if doc:
+                session = {
+                    "session_id": doc["session_id"],
+                    "title": doc["title"],
+                    "created_at": int(doc["created_at"].timestamp() * 1000),
+                    "updated_at": int(doc["updated_at"].timestamp() * 1000),
+                    "message_count": doc.get("message_count", 0)
+                }
+                
+                # Include messages if they exist
+                if "messages" in doc:
+                    session["messages"] = doc["messages"]
+                
+                logger.info(f"Found existing copy of shared chat for user {user_id}")
+                return session
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error finding session by share token: {e}")
+            return None
 
 # Global instance
 mongodb_memory = MongoDBMemoryManager()
@@ -503,3 +536,7 @@ async def create_shared_chat(session_id: str, user_email: str, share_token: str)
 async def get_shared_chat(share_token: str) -> Optional[Dict]:
     """Get shared chat information by token."""
     return await mongodb_memory.get_shared_chat(share_token)
+
+async def find_session_by_share_token(user_id: str, share_token: str) -> Optional[Dict]:
+    """Find if user already has a copy from this share token."""
+    return await mongodb_memory.find_session_by_share_token(user_id, share_token)

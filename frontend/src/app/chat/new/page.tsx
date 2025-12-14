@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ChatSidebar from '@/components/ChatSidebar';
 import ChatInterface from '@/components/ChatInterface';
+import TokenMonitor from '@/components/TokenMonitor';
 import { getCurrentUser, verifyToken, createNewSessionId, setCurrentSessionId } from '@/lib/session-utils';
 
 export default function NewChatPage() {
@@ -218,15 +219,18 @@ export default function NewChatPage() {
   }
 
   return (
-    <div className="chatgpt-container">
-      <ChatSidebar
-        isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        onNewChat={handleNewChat}
-        activeSessionId={undefined}
-      />
-      <ChatInterface sessionId={undefined} />
-    </div>
+    <>
+      <TokenMonitor />
+      <div className="chatgpt-container">
+        <ChatSidebar
+          isOpen={isSidebarOpen}
+          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          onNewChat={handleNewChat}
+          activeSessionId={undefined}
+        />
+        <ChatInterface sessionId={undefined} />
+      </div>
+    </>
   );
 }
 

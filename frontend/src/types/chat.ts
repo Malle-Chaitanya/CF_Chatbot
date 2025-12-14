@@ -6,6 +6,8 @@ export interface User {
   email: string;
   access_token: string;
   refresh_token: string;
+  token_expires_at?: number;  // Timestamp when token expires (milliseconds)
+  token_issued_at?: number;   // Timestamp when token was issued (milliseconds)
 }
 
 export interface Message {

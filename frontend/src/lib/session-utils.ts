@@ -159,7 +159,8 @@ export async function syncSessionToBackend(sessionData: ChatSession): Promise<vo
 }
 
 // Fetch user sessions from backend and merge with localStorage
-export async function fetchAndMergeUserSessions(): Promise<void> {
+// Phase 2.2: Non-recursive retry with explicit flag
+export async function fetchAndMergeUserSessions(options = { retryAttempted: false }): Promise<void> {
   try {
     if (typeof window === 'undefined') return;
     
@@ -178,6 +179,32 @@ export async function fetchAndMergeUserSessions(): Promise<void> {
         'Authorization': `Bearer ${user.access_token}`
       }
     });
+    
+    // Phase 2.2: Handle 401 with single retry after token refresh
+    if (response.status === 401 && !options.retryAttempted) {
+      console.warn('[SESSIONS] Got 401, attempting token refresh (retry 1/1)...');
+      
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        console.log('[SESSIONS] Token refreshed, retrying request...');
+        // Non-recursive call with retry flag
+        return await fetchAndMergeUserSessions({ retryAttempted: true });
+      }
+      
+      // Refresh failed, logout
+      console.warn('[SESSIONS] Token refresh failed, logging out');
+      localStorage.removeItem('user');
+      window.location.href = '/login?error=session_expired';
+      return;
+    }
+    
+    // If we already retried and got 401 again, immediate logout
+    if (response.status === 401 && options.retryAttempted) {
+      console.error('[SESSIONS] Got 401 after retry, logging out immediately');
+      localStorage.removeItem('user');
+      window.location.href = '/login?error=session_expired';
+      return;
+    }
     
     if (!response.ok) {
       console.error('[SESSIONS] Failed to fetch sessions:', response.status);
@@ -227,7 +254,8 @@ export async function fetchAndMergeUserSessions(): Promise<void> {
 }
 
 // Fetch all users' chats (one recent chat per user)
-export async function fetchAllUsersChats(): Promise<OtherUserChat[]> {
+// Phase 2.2: Non-recursive retry with explicit flag
+export async function fetchAllUsersChats(options = { retryAttempted: false }): Promise<OtherUserChat[]> {
   try {
     if (typeof window === 'undefined') return [];
     
@@ -242,6 +270,32 @@ export async function fetchAllUsersChats(): Promise<OtherUserChat[]> {
       }
     });
     
+    // Phase 2.2: Handle 401 with single retry after token refresh
+    if (response.status === 401 && !options.retryAttempted) {
+      console.warn('[SESSIONS] Got 401, attempting token refresh (retry 1/1)...');
+      
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        console.log('[SESSIONS] Token refreshed, retrying request...');
+        // Non-recursive call with retry flag
+        return await fetchAllUsersChats({ retryAttempted: true });
+      }
+      
+      // Refresh failed, logout
+      console.warn('[SESSIONS] Token refresh failed, logging out');
+      localStorage.removeItem('user');
+      window.location.href = '/login?error=session_expired';
+      return [];
+    }
+    
+    // If we already retried and got 401 again, immediate logout
+    if (response.status === 401 && options.retryAttempted) {
+      console.error('[SESSIONS] Got 401 after retry, logging out immediately');
+      localStorage.removeItem('user');
+      window.location.href = '/login?error=session_expired';
+      return [];
+    }
+    
     if (response.ok) {
       const data = await response.json();
       return data.sessions || [];
@@ -255,7 +309,11 @@ export async function fetchAllUsersChats(): Promise<OtherUserChat[]> {
 }
 
 // Load another user's chat session (read-only)
-export async function loadOthersSession(otherSessionId: string): Promise<ChatSession | null> {
+// Phase 2.2: Non-recursive retry with explicit flag
+export async function loadOthersSession(
+  otherSessionId: string, 
+  options = { retryAttempted: false }
+): Promise<ChatSession | null> {
   try {
     if (typeof window === 'undefined') return null;
     
@@ -280,6 +338,32 @@ export async function loadOthersSession(otherSessionId: string): Promise<ChatSes
           'Authorization': `Bearer ${user.access_token}`
         }
       });
+      
+      // Phase 2.2: Handle 401 with single retry after token refresh
+      if (response.status === 401 && !options.retryAttempted) {
+        console.warn('[SESSION] Got 401, attempting token refresh (retry 1/1)...');
+        
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+          console.log('[SESSION] Token refreshed, retrying request...');
+          // Non-recursive call with retry flag
+          return await loadOthersSession(otherSessionId, { retryAttempted: true });
+        }
+        
+        // Refresh failed, logout
+        console.warn('[SESSION] Token refresh failed, logging out');
+        localStorage.removeItem('user');
+        window.location.href = '/login?error=session_expired';
+        return null;
+      }
+      
+      // If we already retried and got 401 again, immediate logout
+      if (response.status === 401 && options.retryAttempted) {
+        console.error('[SESSION] Got 401 after retry, logging out immediately');
+        localStorage.removeItem('user');
+        window.location.href = '/login?error=session_expired';
+        return null;
+      }
       
       if (response.status === 403) {
         console.error('[SESSION] Access denied (403) - user does not have permission to view this chat');
@@ -358,6 +442,224 @@ export async function verifyToken(accessToken: string): Promise<boolean> {
   } catch (error) {
     console.error('[AUTH] Token verification failed:', error);
     return false;
+  }
+}
+
+// ============================================================================
+// PHASE 2.1: Token Refresh with Single-Flight Mutex
+// ============================================================================
+
+// Module-level mutex to prevent parallel refresh attempts
+let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Show token refresh notification
+ */
+function showTokenRefreshNotification(): void {
+  if (typeof window === 'undefined') return;
+  
+  // Remove any existing notification
+  const existing = document.getElementById('token-refresh-notification');
+  if (existing) existing.remove();
+  
+  const notification = document.createElement('div');
+  notification.id = 'token-refresh-notification';
+  notification.style.cssText = `
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    background: rgba(1, 41, 172, 0.95);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    z-index: 9999;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideInRight 0.3s ease-out;
+  `;
+  notification.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM4 8a4 4 0 1 1 8 0 4 4 0 0 1-8 0z"/>
+      <path d="M7.5 5.5a.5.5 0 0 1 1 0v2.293l1.354 1.353a.5.5 0 0 1-.708.708l-1.5-1.5A.5.5 0 0 1 7.5 8V5.5z"/>
+    </svg>
+    Refreshing session...
+  `;
+  document.body.appendChild(notification);
+  
+  // Remove after 2 seconds
+  setTimeout(() => {
+    notification.style.animation = 'slideOutRight 0.3s ease-in';
+    setTimeout(() => notification.remove(), 300);
+  }, 2000);
+}
+
+/**
+ * Refresh access token with single-flight guarantee.
+ * Multiple simultaneous calls will wait for the same refresh operation.
+ * 
+ * SECURITY: Only sends refresh_token to backend.
+ * Backend owns all OAuth secrets (client_id, client_secret).
+ * 
+ * @returns true if refresh succeeded, false if failed (requires re-login)
+ */
+export async function refreshAccessToken(): Promise<boolean> {
+  // If refresh already in progress, wait for it
+  if (refreshPromise) {
+    console.log('[AUTH] Refresh already in progress, waiting...');
+    return refreshPromise;
+  }
+  
+  // Start new refresh and store promise
+  refreshPromise = (async () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      
+      const user = getCurrentUser();
+      if (!user || !user.refresh_token) {
+        console.error('[AUTH] No refresh token available');
+        return false;
+      }
+      
+      console.log('[AUTH] Refreshing access token...');
+      
+      // Show notification
+      showTokenRefreshNotification();
+      
+      // SECURITY: Only send refresh_token, backend handles OAuth secrets
+      const response = await fetch(`${getApiBase()}/auth/microsoft/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          refresh_token: user.refresh_token,
+        })
+      });
+      
+      if (!response.ok) {
+        console.error('[AUTH] Token refresh failed:', response.status);
+        return false;
+      }
+      
+      const data = await response.json();
+      
+      // Update user with new tokens and expiration
+      const updatedUser = {
+        ...user,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token || user.refresh_token,
+        token_expires_at: Date.now() + (data.expires_in * 1000),
+        token_issued_at: Date.now(),
+      };
+      
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('[AUTH] Token refreshed successfully. Expires in:', data.expires_in, 'seconds');
+      return true;
+      
+    } catch (error) {
+      console.error('[AUTH] Token refresh error:', error);
+      return false;
+    } finally {
+      // Always clear mutex when done
+      refreshPromise = null;
+    }
+  })();
+  
+  return refreshPromise;
+}
+
+/**
+ * Check if access token is expired or expiring soon.
+ * @param marginMinutes - Refresh if token expires in less than this many minutes (default: 5)
+ * @returns true if token needs refresh
+ */
+export function isTokenExpiringSoon(marginMinutes: number = 5): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  const user = getCurrentUser();
+  if (!user || !user.token_expires_at) {
+    return false;
+  }
+  
+  const now = Date.now();
+  const expiresAt = user.token_expires_at;
+  const marginMs = marginMinutes * 60 * 1000;
+  
+  // Return true if token expires in less than margin
+  return (expiresAt - now) < marginMs;
+}
+
+/**
+ * Ensure we have a valid access token, refreshing if necessary.
+ * Call this before API requests that require authentication.
+ * 
+ * @returns true if token is valid or was successfully refreshed, false if auth failed
+ */
+export async function ensureValidToken(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  
+  const user = getCurrentUser();
+  if (!user) return false;
+  
+  // If token is expiring soon, refresh it proactively
+  if (isTokenExpiringSoon(5)) {
+    console.log('[AUTH] Token expiring soon, refreshing proactively...');
+    const refreshed = await refreshAccessToken();
+    
+    if (!refreshed) {
+      console.error('[AUTH] Proactive token refresh failed');
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+// ============================================================================
+// PHASE 3: Background Token Monitor
+// ============================================================================
+
+let tokenMonitorInterval: NodeJS.Timeout | null = null;
+
+/**
+ * Start background token monitoring.
+ * Checks token expiration every 2 minutes and refreshes proactively.
+ */
+export function startTokenMonitor(): void {
+  if (typeof window === 'undefined') return;
+  
+  // Don't start multiple monitors
+  if (tokenMonitorInterval) {
+    console.log('[TOKEN_MONITOR] Already running');
+    return;
+  }
+  
+  console.log('[TOKEN_MONITOR] Starting background token monitor (checks every 2 minutes)');
+  
+  tokenMonitorInterval = setInterval(async () => {
+    const user = getCurrentUser();
+    if (!user || !user.access_token) {
+      console.log('[TOKEN_MONITOR] No authenticated user, skipping check');
+      return;
+    }
+    
+    console.log('[TOKEN_MONITOR] Periodic token check...');
+    const tokenValid = await ensureValidToken();
+    if (!tokenValid) {
+      console.warn('[TOKEN_MONITOR] Token invalid, user will need to re-login on next action');
+    }
+  }, 2 * 60 * 1000); // Every 2 minutes
+}
+
+/**
+ * Stop background token monitoring.
+ */
+export function stopTokenMonitor(): void {
+  if (tokenMonitorInterval) {
+    clearInterval(tokenMonitorInterval);
+    tokenMonitorInterval = null;
+    console.log('[TOKEN_MONITOR] Stopped background token monitor');
   }
 }
 
