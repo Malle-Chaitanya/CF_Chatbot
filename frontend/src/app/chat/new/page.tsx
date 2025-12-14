@@ -166,7 +166,7 @@ export default function NewChatPage() {
       // Trigger updateEmptyState through the chat initialization
       const emptyState = document.getElementById('empty-state');
       const inputSection = document.querySelector('.chatgpt-input-section') as HTMLElement;
-      if (emptyState && inputSection) {
+      if (emptyState && inputSection && messagesDiv) {
         emptyState.style.display = 'flex';
         messagesDiv.style.display = 'none';
         inputSection.classList.remove('show');
