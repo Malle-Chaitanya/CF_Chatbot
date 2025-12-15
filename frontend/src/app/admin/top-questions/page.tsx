@@ -117,6 +117,20 @@ export default function AdminTopQuestionsPage() {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
+            onClick={() => router.push('/admin/dashboard')}
+            style={{
+              padding: '10px 14px',
+              borderRadius: '10px',
+              border: '1px solid #d1d5db',
+              background: 'white',
+              cursor: 'pointer',
+              color: '#111827',
+              fontWeight: 600
+            }}
+          >
+            Dashboard
+          </button>
+          <button
             onClick={() => router.push('/chat/new')}
             style={{
               padding: '10px 14px',

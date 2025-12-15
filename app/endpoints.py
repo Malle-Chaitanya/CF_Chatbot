@@ -11,15 +11,19 @@ import base64
 import asyncio
 import re
 from datetime import datetime
+import logging
 
 from app.llm import setup_qa_chain
+
+logger = logging.getLogger(__name__)
 from app.llm_factory import get_llm
 from app.vectorstore import retriever, vectorstore, bm25_retriever
 from app.mongodb_memory import (
     mongodb_memory,
     add_to_conversation, get_conversation_context, get_user_chat_history, 
     clear_user_chat_history, save_session, get_all_sessions, get_user_sessions, 
-    get_session_by_id, create_shared_chat, get_shared_chat
+    get_session_by_id, create_shared_chat, get_shared_chat, get_user_statistics,
+    get_rankers_by_date, get_faqs_by_date, migrate_existing_data_to_user_activity
 )
 from app.helpers import strip_markdown, preserve_markdown
 from app.langfuse_integration import langfuse_tracker
@@ -1043,6 +1047,13 @@ async def chat(request: Request, auth_user: dict = Depends(require_auth)):
     # Use user_id if provided, otherwise fall back to session_id for backward compatibility
     conversation_id = user_id if user_id else session_id
 
+    # Track message event for time-based analytics (BEFORE processing)
+    try:
+        await mongodb_memory.insert_message_event(user_id=user_id, session_id=session_id, user_email=user_email)
+    except Exception as e:
+        logger.error(f"Failed to track message event: {e}")
+        # Don't break chat flow if event tracking fails
+
     # FIRST: Check if we have a corrected response for this question
     corrected_answer = find_similar_corrected_response(question)
     
@@ -1084,6 +1095,15 @@ async def chat(request: Request, auth_user: dict = Depends(require_auth)):
         intent_method = intent_result.get("method", "unknown")
         
         print(f"[INTENT] Classified as '{intent}' (confidence: {intent_confidence:.2f}, method: {intent_method})")
+        
+        # Track FAQ event for informational queries (not conversational)
+        try:
+            # Track as FAQ if it's an informational query (not conversational)
+            if not is_conversational_query(question):
+                await mongodb_memory.insert_faq_event(user_id=user_id, question=question, user_email=user_email)
+        except Exception as e:
+            logger.error(f"Failed to track FAQ event: {e}")
+            # Don't break chat flow if event tracking fails
         
         # Check if vectorstore is available
         if vectorstore is None:
@@ -1264,6 +1284,13 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
     # Use user_id if provided, otherwise fall back to session_id for backward compatibility
     conversation_id = user_id if user_id else session_id
 
+    # Track message event for time-based analytics (BEFORE processing)
+    try:
+        await mongodb_memory.insert_message_event(user_id=user_id, session_id=session_id, user_email=user_email)
+    except Exception as e:
+        logger.error(f"Failed to track message event: {e}")
+        # Don't break chat flow if event tracking fails
+
     async def generate_stream():
         try:
             # FIRST: Check if we have a corrected response for this question
@@ -1342,6 +1369,14 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
             
             # Check if this is a conversational query
             is_conv = is_conversational_query(question)
+            
+            # Track FAQ event for informational queries (not conversational)
+            if not is_conv:
+                try:
+                    await mongodb_memory.insert_faq_event(user_id=user_id, question=question, user_email=user_email)
+                except Exception as e:
+                    logger.error(f"Failed to track FAQ event: {e}")
+                    # Don't break chat flow if event tracking fails
             
             if is_conv:
                 # Handle conversational queries directly without document retrieval
@@ -3353,3 +3388,427 @@ async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
             
     except Exception as e:
         return {"error": f"OAuth callback failed: {str(e)}"}
+
+
+# ============================================================================
+# ADMIN USER STATISTICS ENDPOINTS (Single Source of Truth)
+# ============================================================================
+
+@router.get("/admin/users/summary")
+async def get_users_summary(
+    exclude_users: Optional[str] = Query(None, description="Comma-separated list of user emails to exclude"),
+    current_user: dict = Depends(require_restricted_admin)
+):
+    """
+    Get ALL-TIME user statistics and leaderboard from user_activity collection.
+    
+    - Restricted to restricted admin allowlist
+    - Returns: total users, lifetime stats (total messages, total sessions, avg messages per session, last active)
+    - Sorted by total messages (descending)
+    - NO date filtering (all-time only)
+    """
+    try:
+        await mongodb_memory.connect()
+        
+        if mongodb_memory.database is None:
+            raise HTTPException(status_code=503, detail="Database connection not available")
+        
+        # Parse excluded users list
+        # CRITICAL FIX: Only exclude users if explicitly provided by frontend
+        # If no exclude_users parameter is sent, exclude_users should be empty list (no exclusions)
+        excluded_list = []
+        if exclude_users:
+            excluded_list = [email.strip() for email in exclude_users.split(",") if email.strip()]
+        
+        users = await get_user_statistics(exclude_users=excluded_list if excluded_list else None)
+        
+        logger.info(f"[USERS_SUMMARY] Retrieved {len(users)} users (all-time)")
+        
+        return {
+            "total_users": len(users),
+            "users": users,
+            "generated_at": datetime.utcnow().isoformat(),
+            "filters_applied": {
+                "excluded_users_count": len(excluded_list) if excluded_list else 0
+            },
+            "data_source": "user_activity",
+            "time_range": "all_time"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Error getting users summary: {e}")
+        import traceback
+        logger.error(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to get users summary: {str(e)}")
+
+
+@router.get("/admin/rankers")
+async def get_rankers_endpoint(
+    from_date: Optional[str] = Query(None, description="Start date in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
+    to_date: Optional[str] = Query(None, description="End date in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
+    exclude_users: Optional[str] = Query(None, description="Comma-separated list of user emails to exclude"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of rankers to return"),
+    current_user: dict = Depends(require_restricted_admin)
+):
+    """
+    Get user rankers by date range from message_events collection.
+    
+    - Restricted to restricted admin allowlist
+    - Returns: users ranked by message count within the specified date range
+    - Uses message_events collection for accurate time-based analytics
+    - If no dates provided, returns all-time rankers from message_events
+    """
+    try:
+        await mongodb_memory.connect()
+        
+        if mongodb_memory.database is None:
+            raise HTTPException(status_code=503, detail="Database connection not available")
+        
+        # Parse date strings to datetime objects
+        start_dt = None
+        end_dt = None
+        
+        if from_date:
+            try:
+                try:
+                    start_dt = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                except ValueError:
+                    start_dt = datetime.strptime(from_date, '%Y-%m-%d')
+                    start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid from_date format: {e}")
+        
+        if to_date:
+            try:
+                try:
+                    end_dt = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                except ValueError:
+                    end_dt = datetime.strptime(to_date, '%Y-%m-%d')
+                    end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid to_date format: {e}")
+        
+        # Parse excluded users list
+        # CRITICAL FIX: Only exclude users if explicitly provided by frontend
+        # If no exclude_users parameter is sent, exclude_users should be empty list (no exclusions)
+        excluded_list = []
+        if exclude_users:
+            excluded_list = [email.strip() for email in exclude_users.split(",") if email.strip()]
+        
+        rankers = await get_rankers_by_date(
+            start_date=start_dt,
+            end_date=end_dt,
+            exclude_users=excluded_list,
+            limit=limit
+        )
+        
+        logger.info(f"[RANKERS] Retrieved {len(rankers)} rankers (from={from_date}, to={to_date}, excluded={len(excluded_list) if excluded_list else 0})")
+        
+        # Debug: Log date parsing
+        if start_dt:
+            logger.info(f"[RANKERS] Parsed start_date: {start_dt} (timezone: {start_dt.tzinfo})")
+        if end_dt:
+            logger.info(f"[RANKERS] Parsed end_date: {end_dt} (timezone: {end_dt.tzinfo})")
+        
+        return {
+            "rankers": rankers,
+            "total_rankers": len(rankers),
+            "generated_at": datetime.utcnow().isoformat(),
+            "filters_applied": {
+                "from_date": from_date,
+                "to_date": to_date,
+                "excluded_users_count": len(excluded_list) if excluded_list else 0
+            },
+            "data_source": "message_events",
+            "time_range": f"{from_date or 'all_time'} to {to_date or 'all_time'}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Error getting rankers: {e}")
+        import traceback
+        logger.error(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to get rankers: {str(e)}")
+
+
+@router.get("/admin/faqs")
+async def get_faqs_endpoint(
+    from_date: Optional[str] = Query(None, description="Start date in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
+    to_date: Optional[str] = Query(None, description="End date in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of FAQs to return"),
+    current_user: dict = Depends(require_restricted_admin)
+):
+    """
+    Get most frequently asked questions by date range from faq_events collection.
+    
+    - Restricted to restricted admin allowlist
+    - Returns: questions ranked by frequency within the specified date range
+    - Uses faq_events collection for accurate FAQ analytics
+    - If no dates provided, returns all-time FAQs
+    """
+    try:
+        await mongodb_memory.connect()
+        
+        if mongodb_memory.database is None:
+            raise HTTPException(status_code=503, detail="Database connection not available")
+        
+        # Parse date strings to datetime objects
+        start_dt = None
+        end_dt = None
+        
+        if from_date:
+            try:
+                try:
+                    start_dt = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
+                except ValueError:
+                    start_dt = datetime.strptime(from_date, '%Y-%m-%d')
+                    start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid from_date format: {e}")
+        
+        if to_date:
+            try:
+                try:
+                    end_dt = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
+                except ValueError:
+                    end_dt = datetime.strptime(to_date, '%Y-%m-%d')
+                    end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid to_date format: {e}")
+        
+        faqs = await get_faqs_by_date(
+            start_date=start_dt,
+            end_date=end_dt,
+            limit=limit
+        )
+        
+        logger.info(f"[FAQS] Retrieved {len(faqs)} FAQs (from={from_date}, to={to_date})")
+        
+        return {
+            "faqs": faqs,
+            "total_faqs": len(faqs),
+            "generated_at": datetime.utcnow().isoformat(),
+            "filters_applied": {
+                "from_date": from_date,
+                "to_date": to_date
+            },
+            "data_source": "faq_events",
+            "time_range": f"{from_date or 'all_time'} to {to_date or 'all_time'}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Error getting FAQs: {e}")
+        import traceback
+        logger.error(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to get FAQs: {str(e)}")
+
+
+@router.get("/admin/user-stats")
+async def get_user_statistics_endpoint(
+    start_date: Optional[str] = Query(None, description="Start date in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
+    end_date: Optional[str] = Query(None, description="End date in ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"),
+    exclude_users: Optional[str] = Query(None, description="Comma-separated list of user emails to exclude"),
+    current_user: dict = Depends(require_restricted_admin)
+):
+    """
+    Legacy endpoint: Returns user statistics.
+    
+    - If dates provided: Uses message_events for time-based rankers
+    - If no dates: Uses user_activity for all-time stats
+    
+    DEPRECATED: Use /admin/users/summary (all-time) or /admin/rankers (date-based) instead.
+    This endpoint is kept for backward compatibility.
+    """
+    try:
+        # If dates are provided, use date-based rankers
+        if start_date or end_date:
+            # Delegate to rankers endpoint
+            return await get_rankers_endpoint(
+                from_date=start_date,
+                to_date=end_date,
+                exclude_users=exclude_users,
+                limit=100,
+                current_user=current_user
+            )
+        else:
+            # No dates: use all-time summary
+            return await get_users_summary(
+                exclude_users=exclude_users,
+                current_user=current_user
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ERROR] Error getting user statistics: {e}")
+        import traceback
+        logger.error(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user statistics: {str(e)}")
+
+
+@router.post("/admin/user-stats/migrate")
+async def migrate_user_activity_data(
+    current_user: dict = Depends(require_restricted_admin)
+):
+    """
+    Migration endpoint: Backfill user_activity collection from existing chat_sessions.
+    This should be run once to migrate existing data to the new single source of truth.
+    
+    - Restricted to restricted admin allowlist
+    - One-time operation to migrate historical data
+    """
+    try:
+        await mongodb_memory.connect()
+        
+        if mongodb_memory.database is None:
+            raise HTTPException(status_code=503, detail="Database connection not available")
+        
+        result = await migrate_existing_data_to_user_activity()
+        
+        return {
+            "message": "Migration completed successfully",
+            "migrated_users": result.get("migrated_users", 0),
+            "total_sessions_processed": result.get("total_sessions", 0)
+        }
+        
+    except Exception as e:
+        print(f"[ERROR] Migration failed: {e}")
+        import traceback
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+
+
+@router.get("/admin/user-stats/debug")
+async def get_user_statistics_debug(
+    current_user: dict = Depends(require_restricted_admin)
+):
+    """
+    Debug endpoint to verify MongoDB data retrieval.
+    Returns raw MongoDB collection stats and sample data from all collections.
+    """
+    try:
+        await mongodb_memory.connect()
+        
+        if mongodb_memory.database is None:
+            raise HTTPException(status_code=503, detail="Database connection not available")
+        
+        sessions_collection = mongodb_memory.database["chat_sessions"]
+        user_activity_collection = mongodb_memory.database["user_activity"]
+        message_events_collection = mongodb_memory.database["message_events"]
+        faq_events_collection = mongodb_memory.database["faq_events"]
+        
+        # Get collection statistics
+        total_sessions = await sessions_collection.count_documents({})
+        docs_with_messages = await sessions_collection.count_documents({"messages": {"$exists": True, "$ne": []}})
+        total_user_activity = await user_activity_collection.count_documents({})
+        total_message_events = await message_events_collection.count_documents({})
+        total_faq_events = await faq_events_collection.count_documents({})
+        
+        # Get sample documents
+        sample_sessions = await sessions_collection.find({}).limit(3).to_list(length=3)
+        sample_activity = await user_activity_collection.find({}).limit(3).to_list(length=3)
+        sample_message_events = await message_events_collection.find({}).sort("created_at", -1).limit(5).to_list(length=5)
+        sample_faq_events = await faq_events_collection.find({}).sort("created_at", -1).limit(5).to_list(length=5)
+        
+        # Get date range info
+        oldest_session = await sessions_collection.find_one({}, sort=[("created_at", 1)])
+        newest_session = await sessions_collection.find_one({}, sort=[("created_at", -1)])
+        
+        oldest_message_event = await message_events_collection.find_one({}, sort=[("created_at", 1)])
+        newest_message_event = await message_events_collection.find_one({}, sort=[("created_at", -1)])
+        
+        # Get user count
+        unique_users_sessions = await sessions_collection.distinct("user_id")
+        unique_users_activity = await user_activity_collection.distinct("user_id")
+        unique_users_events = await message_events_collection.distinct("user_id")
+        
+        # Check today's events
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = datetime.utcnow().replace(hour=23, minute=59, second=59, microsecond=999999)
+        today_events_count = await message_events_collection.count_documents({
+            "created_at": {"$gte": today_start, "$lte": today_end}
+        })
+        
+        return {
+            "database": mongodb_memory.database.name,
+            "chat_sessions": {
+                "total_documents": total_sessions,
+                "documents_with_messages": docs_with_messages,
+                "unique_users": len(unique_users_sessions),
+                "oldest_session_date": oldest_session.get("created_at").isoformat() if oldest_session and oldest_session.get("created_at") else None,
+                "newest_session_date": newest_session.get("created_at").isoformat() if newest_session and newest_session.get("created_at") else None,
+                "sample_documents": [
+                    {
+                        "session_id": doc.get("session_id"),
+                        "user_id": doc.get("user_id"),
+                        "user_email": doc.get("user_email"),
+                        "message_count": len(doc.get("messages", [])),
+                        "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+                        "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None
+                    }
+                    for doc in sample_sessions
+                ]
+            },
+            "user_activity": {
+                "total_documents": total_user_activity,
+                "unique_users": len(unique_users_activity),
+                "sample_documents": [
+                    {
+                        "user_id": doc.get("user_id"),
+                        "user_email": doc.get("user_email"),
+                        "total_messages": doc.get("total_messages", 0),
+                        "total_sessions": doc.get("total_sessions", 0),
+                        "avg_messages_per_session": doc.get("avg_messages_per_session", 0),
+                        "last_active": doc.get("last_active").isoformat() if doc.get("last_active") else None
+                    }
+                    for doc in sample_activity
+                ]
+            },
+            "message_events": {
+                "total_documents": total_message_events,
+                "unique_users": len(unique_users_events),
+                "today_events_count": today_events_count,
+                "oldest_event_date": oldest_message_event.get("created_at").isoformat() if oldest_message_event and oldest_message_event.get("created_at") else None,
+                "newest_event_date": newest_message_event.get("created_at").isoformat() if newest_message_event and newest_message_event.get("created_at") else None,
+                "sample_documents": [
+                    {
+                        "user_id": doc.get("user_id"),
+                        "session_id": doc.get("session_id"),
+                        "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+                    }
+                    for doc in sample_message_events
+                ]
+            },
+            "faq_events": {
+                "total_documents": total_faq_events,
+                "sample_documents": [
+                    {
+                        "user_id": doc.get("user_id"),
+                        "question": doc.get("question", "")[:100],
+                        "question_hash": doc.get("question_hash"),
+                        "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+                    }
+                    for doc in sample_faq_events
+                ]
+            },
+            "connection_status": "connected",
+            "recommendations": [
+                "Check message_events collection - events should be created when users send messages",
+                "If message_events is empty, check backend logs for '[EVENT] Inserted message event'",
+                "Run /admin/user-stats/migrate if user_activity is empty",
+                f"Today's events: {today_events_count} (should match messages sent today)"
+            ]
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "connection_status": "error"
+        }
