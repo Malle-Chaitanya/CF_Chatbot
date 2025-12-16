@@ -33,8 +33,10 @@ export default function SharedChatPage() {
         const user = getCurrentUser();
         
         if (!user) {
-          console.log('[AUTH] No user found, redirecting to login');
-          router.replace(`/login?redirect=/chat/shared/${shareToken}`);
+          console.log('[AUTH] No user found!');
+          const redirectUrl = `/login?redirect=/chat/shared/${shareToken}`;
+          console.log('[AUTH] Redirecting to:', redirectUrl);
+          router.replace(redirectUrl);
           return;
         }
 
@@ -112,7 +114,12 @@ export default function SharedChatPage() {
         }
 
         // Call backend API to retrieve and copy shared chat
-        const response = await fetch(`${apiBase}/chat/shared/${shareToken}`, {
+        const endpoint = `${apiBase}/chat/shared/${shareToken}`;
+        const tokenPreview = user.access_token?.substring(0, 20) + '...';
+        console.log('[SHARED] Calling endpoint:', endpoint);
+        console.log('[SHARED] Auth header: Bearer ' + tokenPreview);
+
+        const response = await fetch(endpoint, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${user.access_token}`,
@@ -120,16 +127,27 @@ export default function SharedChatPage() {
           }
         });
 
+        console.log('[SHARED] API response status:', response.status);
+
         if (!response.ok) {
           const errorText = await response.text();
           console.error('[SHARED] API error response:', response.status, errorText);
+          console.error('[SHARED] Full error:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText
+          });
+          
+          let errorMessage = `Failed to load shared chat (${response.status})`;
           if (response.status === 404) {
-            setError('Shared chat not found or has expired');
+            errorMessage = 'Shared chat not found or has expired';
           } else if (response.status === 403) {
-            setError('You do not have permission to access this shared chat');
-          } else {
-            setError(`Failed to load shared chat (${response.status})`);
+            errorMessage = 'You do not have permission to access this shared chat';
+          } else if (response.status === 401) {
+            errorMessage = 'Your session has expired. Please log in again.';
           }
+          
+          setError(errorMessage);
           setIsLoading(false);
           return;
         }

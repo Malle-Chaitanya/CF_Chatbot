@@ -631,45 +631,6 @@ export default function ChatSidebar({
           </div>
         </div>
 
-        {isAdmin && (
-          <div style={{ padding: '12px 16px' }}>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Admin
-            </div>
-            <button
-              onClick={() => router.push('/admin/top-questions')}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '10px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                color: '#111827',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
-              }}
-              onMouseEnter={(e) => {
-                const btn = e.currentTarget;
-                btn.style.borderColor = '#0129ac';
-                btn.style.boxShadow = '0 6px 12px rgba(1, 41, 172, 0.12)';
-              }}
-              onMouseLeave={(e) => {
-                const btn = e.currentTarget;
-                btn.style.borderColor = '#d1d5db';
-                btn.style.boxShadow = 'none';
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 13h2v-2H3v2Zm4 0h2v-2H7v2Zm4 0h2v-2h-2v2Zm4 0h2v-2h-2v2Zm4 0h2v-2h-2v2ZM5 21h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2-3h-4l-2 3H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z" />
-              </svg>
-              <span>Most Asked Questions</span>
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="sidebar-footer">
@@ -682,6 +643,41 @@ export default function ChatSidebar({
             <span className="user-email-small" id="userEmailSidebar">{user?.email || ''}</span>
           </div>
           <div className="user-dropdown-sidebar" id="userDropdown">
+            {isAdmin && (
+              <div className="dropdown-section">
+                <div className="dropdown-section-title">ADMIN</div>
+                <div className="dropdown-item admin-item" onClick={() => {
+                  router.push('/admin/teams');
+                  const dropdown = document.getElementById('userDropdown');
+                  if (dropdown) dropdown.classList.remove('show');
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm9 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                  </svg>
+                  <span>Team Analytics</span>
+                </div>
+                <div className="dropdown-item admin-item" onClick={() => {
+                  router.push('/admin/analytics');
+                  const dropdown = document.getElementById('userDropdown');
+                  if (dropdown) dropdown.classList.remove('show');
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M3 3v18h18M3 15l4-4 3 3 5-5 6 6M9 7h6M9 7v2" />
+                  </svg>
+                  <span>Langfuse Analytics</span>
+                </div>
+                <div className="dropdown-item admin-item" onClick={() => {
+                  router.push('/admin/top-questions');
+                  const dropdown = document.getElementById('userDropdown');
+                  if (dropdown) dropdown.classList.remove('show');
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M3 13h2v-2H3v2Zm4 0h2v-2H7v2Zm4 0h2v-2h-2v2Zm4 0h2v-2h-2v2Zm4 0h2v-2h-2v2ZM5 21h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2-3h-4l-2 3H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z" />
+                  </svg>
+                  <span>Most Asked Questions</span>
+                </div>
+              </div>
+            )}
             <div className="dropdown-item" id="userEmail">{user?.email || ''}</div>
             <div className="dropdown-item logout" onClick={handleLogoutClick}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

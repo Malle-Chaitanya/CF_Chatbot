@@ -143,12 +143,18 @@ function initializeLoginPage() {
     sessionStorage.removeItem('code_verifier');
     localStorage.removeItem('user');
     
-    // Save redirect URL before starting OAuth
+    // Save redirect URL before starting OAuth (use both sessionStorage and localStorage for reliability)
     const urlParams = new URLSearchParams(window.location.search);
     const redirectUrl = urlParams.get('redirect');
     if (redirectUrl) {
       sessionStorage.setItem('oauth_redirect', redirectUrl);
-      console.log('[AUTH] Saved redirect URL:', redirectUrl);
+      localStorage.setItem('oauth_redirect_backup', redirectUrl);  // Backup in localStorage
+      console.log('[AUTH] Saved redirect URL to sessionStorage:', redirectUrl);
+      console.log('[AUTH] Saved redirect URL backup to localStorage:', redirectUrl);
+      console.log('[AUTH] sessionStorage value after save:', sessionStorage.getItem('oauth_redirect'));
+      console.log('[AUTH] localStorage backup value after save:', localStorage.getItem('oauth_redirect_backup'));
+    } else {
+      console.log('[AUTH] No redirect URL found in URL parameters');
     }
     
     const button = event.target as HTMLButtonElement;
@@ -349,9 +355,22 @@ function initializeLoginPage() {
         console.log('[AUTH] Token expires in', Math.round(expiresIn / 60), 'minutes');
         
         // Get redirect URL from sessionStorage (saved before OAuth)
-        const redirectUrl = sessionStorage.getItem('oauth_redirect') || '/';
-        sessionStorage.removeItem('oauth_redirect');  // Clean up
+        // Use backup from localStorage if sessionStorage is empty
+        let redirectUrl = sessionStorage.getItem('oauth_redirect') || '';
         
+        if (!redirectUrl) {
+          redirectUrl = localStorage.getItem('oauth_redirect_backup') || '/';
+          console.log('[AUTH] sessionStorage was empty, using localStorage backup');
+        } else {
+          console.log('[AUTH] Retrieved redirect URL from sessionStorage');
+        }
+        
+        // Clean up both storage locations
+        sessionStorage.removeItem('oauth_redirect');
+        localStorage.removeItem('oauth_redirect_backup');
+        
+        console.log('[AUTH] Final redirect URL:', redirectUrl);
+        console.log('[AUTH] Redirect URL is default (/):', redirectUrl === '/');
         console.log('[AUTH] Login successful, redirecting to:', redirectUrl);
         
         // Clear URL parameters before redirecting
