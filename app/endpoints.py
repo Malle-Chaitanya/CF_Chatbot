@@ -3172,9 +3172,9 @@ async def get_teams_analytics_summary(
         return {"error": str(e), "status": "error"}
 
 
-@router.get("/analytics/langfuse/teams/details/{team_name}")
+@router.get("/analytics/langfuse/teams/details")
 async def get_team_details(
-    team_name: str,
+    team_name: str = Query(..., description="Team name"),
     time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
@@ -3414,7 +3414,8 @@ async def get_langfuse_dashboard_summary(
         
         page = 1
         batch_limit = 100
-        max_pages = 10 if time_filter != "all" else 30  # Faster for filtered queries
+        # Match teams endpoint page limits for consistency
+        max_pages = 3 if time_filter in ["today", "yesterday"] else (5 if time_filter != "all" else 10)
         
         async with httpx.AsyncClient() as client:
             from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
@@ -3424,20 +3425,21 @@ async def get_langfuse_dashboard_summary(
                     # Build params with optional date filter
                     params = {
                         "page": page,
-                        "limit": batch_limit
+                        "limit": batch_limit,
+                        "orderBy[createdAt]": "DESC"
                     }
                     
-                    # Add date range if available
+                    # Add date range if available (using correct Langfuse API format)
                     if start_time:
-                        params["fromTimestamp"] = start_time.isoformat()
+                        params["createdAt[gte]"] = start_time.isoformat() + "Z"
                     if end_time:
-                        params["toTimestamp"] = end_time.isoformat()
+                        params["createdAt[lte]"] = end_time.isoformat() + "Z"
                     
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
                         auth=(LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY),
-                        timeout=30.0  # Reduced timeout for filtered queries
+                        timeout=45.0  # Increased timeout to match teams endpoint
                     )
                     
                     if response.status_code == 429:  # Rate limited
@@ -3589,27 +3591,29 @@ async def get_langfuse_users_analytics(
         users_data = {}
         page = 1
         limit = 100
-        max_pages = 10 if time_filter != "all" else 30  # Faster for filtered queries
+        # Match teams endpoint page limits for consistency
+        max_pages = 3 if time_filter in ["today", "yesterday"] else (5 if time_filter != "all" else 10)
         
         async with httpx.AsyncClient() as client:
             while page <= max_pages:
                 try:
-                    # Fetch traces with pagination and date filter
+                    # Fetch traces with pagination and date filter (using correct Langfuse API format)
                     params = {
                         "page": page,
-                        "limit": limit
+                        "limit": limit,
+                        "orderBy[createdAt]": "DESC"
                     }
                     
                     if start_time:
-                        params["fromTimestamp"] = start_time.isoformat()
+                        params["createdAt[gte]"] = start_time.isoformat() + "Z"
                     if end_time:
-                        params["toTimestamp"] = end_time.isoformat()
+                        params["createdAt[lte]"] = end_time.isoformat() + "Z"
                     
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
                         auth=(LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY),
-                        timeout=30.0  # Reduced timeout
+                        timeout=45.0  # Increased timeout to match teams endpoint
                     )
                     
                     if response.status_code == 429:  # Rate limited
@@ -3954,26 +3958,28 @@ async def get_top_questions_global(
         all_questions = []
         page = 1
         batch_limit = 100
-        max_pages = 10 if time_filter != "all" else 30  # Faster for filtered queries
+        # Match teams endpoint page limits for consistency
+        max_pages = 3 if time_filter in ["today", "yesterday"] else (5 if time_filter != "all" else 10)
         
         async with httpx.AsyncClient() as client:
             while page <= max_pages:
                 try:
                     params = {
                         "page": page,
-                        "limit": batch_limit
+                        "limit": batch_limit,
+                        "orderBy[createdAt]": "DESC"
                     }
                     
                     if start_time:
-                        params["fromTimestamp"] = start_time.isoformat()
+                        params["createdAt[gte]"] = start_time.isoformat() + "Z"
                     if end_time:
-                        params["toTimestamp"] = end_time.isoformat()
+                        params["createdAt[lte]"] = end_time.isoformat() + "Z"
                     
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
                         auth=(LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY),
-                        timeout=30.0  # Reduced timeout
+                        timeout=45.0  # Increased timeout to match teams endpoint
                     )
                     
                     if response.status_code == 429:  # Rate limited
@@ -4547,24 +4553,17 @@ async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
         return {"error": f"OAuth callback failed: {str(e)}"}
 
 
-# DUPLICATE ENDPOINT REMOVED - See /analytics/langfuse/teams/details/{team_name} instead
-
-
-# DEPRECATED: This duplicate endpoint was removed. Use /analytics/langfuse/teams/details/{team_name} instead
-"""
-def get_langfuse_team_details_OLD_REMOVED(
+@router.get("/analytics/langfuse/teams/details")
+async def get_langfuse_team_details(
     team_name: str = Query(..., description="Team name"),
     start_date: str = Query(None, description="Start date in YYYY-MM-DD format"),
     end_date: str = Query(None, description="End date in YYYY-MM-DD format"),
     time_filter: str = Query(None, description="(Legacy) Filter by time: today, yesterday, this_week, last_week, all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
-    # GET DETAILED ANALYTICS FOR A SPECIFIC TEAM INCLUDING ALL MEMBERS AND THEIR STATS
-    # SUPPORTS BOTH DATE RANGE (START_DATE/END_DATE) AND PRESET FILTERS (TIME_FILTER)
-    # OLD CODE REMOVED - NOT USED
-"""
-    # OLD DEPRECATED CODE - REMOVED
-    pass
+    """
+    Get detailed analytics for a specific team including all members and their stats.
+    Supports both date range (start_date/end_date) and preset filters (time_filter).
     """
     try:
         from app.langfuse_integration import langfuse_client
