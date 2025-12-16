@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { getApiBase, getCurrentUser } from '@/lib/session-utils';
 import { isAdminEmail } from '@/constants/admins';
 import { User } from '@/types/chat';
-import React from 'react';
 
 interface TeamStats {
   team_name: string;
@@ -39,12 +38,6 @@ interface TeamDetails {
   team_unique_questions: number;
 }
 
-interface CachedData {
-  timestamp: number;
-  data: TeamStats[];
-  dateRange: { start: Date; end: Date };
-}
-
 export default function TeamsAnalyticsPage() {
   const router = useRouter();
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -52,554 +45,292 @@ export default function TeamsAnalyticsPage() {
   const [fetching, setFetching] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Calendar state
-  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [endDate, setEndDate] = useState<Date>(new Date());
-  const [selectedDateRange, setSelectedDateRange] = useState<{ start: string; end: string } | null>(null);
-  
-  // Data state
   const [teams, setTeams] = useState<TeamStats[]>([]);
-  const [cachedResults, setCachedResults] = useState<Map<string, CachedData>>(new Map());
-  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [selectedTeamDetails, setSelectedTeamDetails] = useState<TeamDetails | null>(null);
   const [showTeamDetails, setShowTeamDetails] = useState<boolean>(false);
 
-  // Verify admin access on mount
+  const [timeFilter, setTimeFilter] = useState<string>('today');
+  const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
+
+  // Check admin access on mount
   useEffect(() => {
-    const user = getCurrentUser();
-    if (!user) {
-      router.replace('/login?error=admin_only');
-      return;
-    }
-
-    if (!isAdminEmail(user.email)) {
-      console.warn('User is not admin:', user.email);
-      router.replace('/login?error=admin_only');
-      return;
-    }
-
-    console.log('[ADMIN] User is admin:', user.email);
-    setAuthUser(user);
-    setLoading(false);
-  }, [router]);
-
-  // Fetch teams analytics with date range
-  const fetchTeamsAnalytics = useCallback(
-    async (user: User, start: Date, end: Date) => {
-      setFetching(true);
-      setError(null);
-
+    async function checkAuth() {
       try {
-        // Check cache first
-        const cacheKey = `${start.toISOString().split('T')[0]}_${end.toISOString().split('T')[0]}`;
-        const cached = cachedResults.get(cacheKey);
-        
-        // Use cache if it exists and is less than 1 hour old
-        if (cached && (Date.now() - cached.timestamp < 3600000)) {
-          console.log('[CACHE] Using cached data for date range:', cacheKey);
-          setTeams(cached.data);
-          setSelectedDateRange({ start: start.toLocaleDateString(), end: end.toLocaleDateString() });
-          setFetching(false);
-          return;
-        }
-
-        // Import token functions
-        const { ensureValidToken, refreshAccessToken } = await import('@/lib/session-utils');
-        
-        // Ensure we have a valid token
-        const tokenValid = await ensureValidToken();
-        if (!tokenValid) {
-          setError('Session expired. Please log in again.');
+        const user = await getCurrentUser();
+        if (!user || !isAdminEmail(user.email)) {
           router.push('/login');
           return;
         }
-
-        // Get fresh user data from localStorage
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-        if (!currentUser.access_token) {
-          setError('No authentication token found');
-          return;
-        }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for date range
-        
-        // Format dates for API: YYYY-MM-DD
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
-        
-        const response = await fetch(
-          `${getApiBase()}/analytics/langfuse/teams/summary?start_date=${startStr}&end_date=${endStr}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${currentUser.access_token}`
-            },
-            signal: controller.signal
-          }
-        ).finally(() => clearTimeout(timeoutId));
-
-        if (response.status === 401) {
-          // Try to refresh token and retry
-          const refreshed = await refreshAccessToken();
-          if (refreshed) {
-            const refreshedUser = JSON.parse(localStorage.getItem('user') || '{}');
-            const retryResponse = await fetch(
-              `${getApiBase()}/analytics/langfuse/teams/summary?start_date=${startStr}&end_date=${endStr}`,
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${refreshedUser.access_token}`
-                }
-              }
-            );
-            
-            if (retryResponse.ok) {
-              const data = await retryResponse.json();
-              if (data.status === 'success') {
-                setTeams(data.teams || []);
-                // Cache the results
-                setCachedResults(prev => new Map(prev).set(cacheKey, {
-                  timestamp: Date.now(),
-                  data: data.teams || [],
-                  dateRange: { start, end }
-                }));
-                setSelectedDateRange({ start: start.toLocaleDateString(), end: end.toLocaleDateString() });
-              }
-            } else {
-              setError('Failed to fetch team analytics');
-            }
-          } else {
-            setError('Session expired. Please log in again.');
-            router.push('/login');
-          }
-        } else if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'success') {
-            setTeams(data.teams || []);
-            // Cache the results
-            setCachedResults(prev => new Map(prev).set(cacheKey, {
-              timestamp: Date.now(),
-              data: data.teams || [],
-              dateRange: { start, end }
-            }));
-            setSelectedDateRange({ start: start.toLocaleDateString(), end: end.toLocaleDateString() });
-          } else if (data.error) {
-            setError(data.error);
-          }
-        } else {
-          setError(`HTTP ${response.status}: Failed to fetch team analytics`);
-        }
+        setAuthUser(user);
       } catch (err) {
-        setError((err as Error).message);
+        console.error('Auth check failed:', err);
+        router.push('/login');
       } finally {
-        setFetching(false);
+        setLoading(false);
       }
-    },
-    [cachedResults, router]
-  );
+    }
+    checkAuth();
+  }, [router]);
 
-  // Fetch specific team details
-  const fetchTeamDetails = useCallback(
-    async (user: User, teamName: string, start: Date, end: Date) => {
-      try {
-        // Import token functions
-        const { ensureValidToken, refreshAccessToken } = await import('@/lib/session-utils');
-        
-        // Ensure we have a valid token
-        const tokenValid = await ensureValidToken();
-        if (!tokenValid) {
-          console.error('Session expired');
-          return;
-        }
+  // Fetch teams analytics
+  const fetchTeamsAnalytics = useCallback(async (filter: string) => {
+    try {
+      setFetching(true);
+      setError(null);
 
-        // Get fresh user data from localStorage
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-        if (!currentUser.access_token) {
-          console.error('No authentication token found');
-          return;
-        }
-
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
-
-        const response = await fetch(
-          `${getApiBase()}/analytics/langfuse/teams/details?team_name=${encodeURIComponent(teamName)}&start_date=${startStr}&end_date=${endStr}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${currentUser.access_token}`
-            }
-          }
-        );
-
-        if (response.status === 401) {
-          // Try to refresh token and retry
-          const refreshed = await refreshAccessToken();
-          if (refreshed) {
-            const refreshedUser = JSON.parse(localStorage.getItem('user') || '{}');
-            const retryResponse = await fetch(
-              `${getApiBase()}/analytics/langfuse/teams/details?team_name=${encodeURIComponent(teamName)}&start_date=${startStr}&end_date=${endStr}`,
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${refreshedUser.access_token}`
-                }
-              }
-            );
-            
-            if (retryResponse.ok) {
-              const data = await retryResponse.json();
-              if (data.status === 'success') {
-                setSelectedTeamDetails(data);
-                setShowTeamDetails(true);
-              }
-            }
-          }
-        } else if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'success') {
-            setSelectedTeamDetails(data);
-            setShowTeamDetails(true);
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching team details:', err);
+      const user = await getCurrentUser();
+      if (!user) {
+        setError('Not authenticated');
+        return;
       }
-    },
-    []
-  );
 
-  // Initialize with today's date on mount
-  useEffect(() => {
-    const today = new Date();
-    setStartDate(today);
-    setEndDate(today);
+      const apiBase = getApiBase();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (user.access_token) {
+        headers['Authorization'] = `Bearer ${user.access_token}`;
+      }
+
+      const response = await fetch(
+        `${apiBase}/analytics/langfuse/teams/summary?time_filter=${filter}`,
+        {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      setTeams(data.teams || []);
+      setLastFetchTime(Date.now());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch team analytics';
+      setError(message);
+      console.error('Teams analytics fetch error:', err);
+    } finally {
+      setFetching(false);
+    }
   }, []);
+
+  // Fetch team details
+  const fetchTeamDetails = useCallback(async (teamName: string) => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) return;
+
+      const apiBase = getApiBase();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (user.access_token) {
+        headers['Authorization'] = `Bearer ${user.access_token}`;
+      }
+
+      const response = await fetch(
+        `${apiBase}/analytics/langfuse/teams/details/${encodeURIComponent(teamName)}?time_filter=${timeFilter}`,
+        {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedTeamDetails(data);
+        setShowTeamDetails(true);
+      }
+    } catch (err) {
+      console.error('Team details fetch error:', err);
+    }
+  }, [timeFilter]);
+
+  // Handle filter change
+  const handleFilterChange = (filter: string) => {
+    setTimeFilter(filter);
+    fetchTeamsAnalytics(filter);
+  };
+
+  // Initial fetch on auth
+  useEffect(() => {
+    if (!loading && authUser) {
+      fetchTeamsAnalytics(timeFilter);
+    }
+  }, [loading, authUser, timeFilter]);
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', fontFamily: 'Inter, system-ui, sans-serif' }}>
-        <p style={{ color: '#6b7280' }}>Checking admin access...</p>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>
+        Checking access...
       </div>
     );
   }
 
-  const totalTeams = teams.length || 8;  // Default to 8 teams
-  const totalQuestions = teams.reduce((sum, t) => sum + t.total_questions, 0);
-  const activeTeams = teams.filter(t => t.total_questions > 0).length;
-
   return (
-    <div style={{ padding: '32px', maxWidth: '1600px', margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '6px' }}>👥 Team Analytics</h1>
-          <p style={{ color: '#6b7280', fontSize: '14px' }}>Team-wise user engagement and question analytics</p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => router.push('/chats')}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              color: '#111827',
-              fontWeight: 600
-            }}
-          >
-            Back to chats
-          </button>
-          <button
-            onClick={() => {
-              if (authUser) fetchTeamsAnalytics(authUser);
-            }}
-            disabled={fetching}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: 'none',
-              background: '#0129ac',
-              color: 'white',
-              cursor: fetching ? 'not-allowed' : 'pointer',
-              fontWeight: 700,
-              opacity: fetching ? 0.6 : 1
-            }}
-          >
-            {fetching ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>Team Analytics</h1>
+        <p style={{ color: '#6b7280', fontSize: '16px' }}>Track team performance and questions</p>
       </div>
 
-      {/* Date Range Picker */}
-      <div style={{
-        background: '#ede9fe',
-        padding: '16px',
-        borderRadius: '12px',
-        marginBottom: '20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '16px',
-        flexWrap: 'wrap'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>📅</span>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#111827',
-            fontWeight: 600,
-            fontSize: '14px'
-          }}>
-            <input
-              type="date"
-              value={startDate.toISOString().split('T')[0]}
-              onChange={(e) => setStartDate(new Date(e.target.value))}
-              style={{
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            />
-            <span>→</span>
-            <input
-              type="date"
-              value={endDate.toISOString().split('T')[0]}
-              onChange={(e) => setEndDate(new Date(e.target.value))}
-              style={{
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            />
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '10px' }}>
+      {/* Filter Buttons */}
+      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        {['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'all'].map((filter) => (
           <button
-            onClick={() => {
-              const today = new Date();
-              setStartDate(today);
-              setEndDate(today);
-            }}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              color: '#111827',
-              cursor: 'pointer',
-              fontWeight: 500,
-              fontSize: '12px'
-            }}
-          >
-            Reset
-          </button>
-          <button
-            onClick={() => {
-              if (authUser) {
-                fetchTeamsAnalytics(authUser, startDate, endDate);
-              }
-            }}
-            disabled={fetching}
+            key={filter}
+            onClick={() => handleFilterChange(filter)}
             style={{
               padding: '8px 16px',
-              borderRadius: '6px',
-              border: 'none',
-              background: '#7c3aed',
-              color: 'white',
-              cursor: fetching ? 'not-allowed' : 'pointer',
-              fontWeight: 600,
-              fontSize: '12px',
-              opacity: fetching ? 0.6 : 1
+              borderRadius: '8px',
+              border: timeFilter === filter ? '2px solid #0129ac' : '1px solid #e5e7eb',
+              background: timeFilter === filter ? '#0129ac' : 'white',
+              color: timeFilter === filter ? 'white' : '#111827',
+              cursor: 'pointer',
+              fontWeight: timeFilter === filter ? '600' : '500',
+              fontSize: '14px',
+              transition: 'all 0.2s ease',
             }}
           >
-            {fetching ? 'Fetching...' : 'Apply'}
+            {filter === 'this_week' ? 'This Week' : filter === 'last_week' ? 'Last Week' : filter === 'this_month' ? 'This Month' : filter.charAt(0).toUpperCase() + filter.slice(1)}
           </button>
-        </div>
+        ))}
       </div>
-      
-      {/* Selected Date Range Info */}
-      {selectedDateRange && (
-        <div style={{
-          background: '#f0fdf4',
-          padding: '12px 14px',
-          borderRadius: '8px',
-          marginBottom: '16px',
-          color: '#166534',
-          fontSize: '13px',
-          border: '1px solid #bbf7d0'
-        }}>
-          ✓ Showing data for {selectedDateRange.start} to {selectedDateRange.end}
-          {cachedResults.size > 0 && (
-            <span style={{ marginLeft: '8px', opacity: 0.7 }}>
-              (Cached: {cachedResults.size} date range{cachedResults.size > 1 ? 's' : ''})
-            </span>
-          )}
+
+      {/* Fetch Time */}
+      {lastFetchTime && (
+        <div style={{ marginBottom: '16px', fontSize: '12px', color: '#9ca3af' }}>
+          Last updated: {new Date(lastFetchTime).toLocaleTimeString()}
         </div>
       )}
 
+      {/* Error Message */}
       {error && (
         <div style={{
-          background: '#fef2f2',
-          color: '#b91c1c',
-          padding: '12px 14px',
-          borderRadius: '10px',
-          marginBottom: '20px',
-          border: '1px solid #fecdd3'
+          padding: '12px 16px',
+          backgroundColor: '#fee2e2',
+          border: '1px solid #fecaca',
+          borderRadius: '8px',
+          color: '#991b1b',
+          marginBottom: '24px'
         }}>
           Error: {error}
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '30px'
-      }}>
+      {/* Loading State */}
+      {fetching && (
         <div style={{
-          background: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+          padding: '12px 16px',
+          backgroundColor: '#dbeafe',
+          border: '1px solid #93c5fd',
+          borderRadius: '8px',
+          color: '#1e40af',
+          marginBottom: '24px'
         }}>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 8px 0', fontWeight: 500 }}>Total Teams</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0 }}>{totalTeams}</p>
+          Loading team data...
         </div>
-        <div style={{
-          background: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-        }}>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 8px 0', fontWeight: 500 }}>Active Teams</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0 }}>{activeTeams}</p>
-        </div>
-        <div style={{
-          background: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-        }}>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 8px 0', fontWeight: 500 }}>Total Questions</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0 }}>{totalQuestions}</p>
-        </div>
-        <div style={{
-          background: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-        }}>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 8px 0', fontWeight: 500 }}>Avg Questions/Team</p>
-          <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0 }}>
-            {totalTeams > 0 ? Math.round(totalQuestions / totalTeams) : 0}
-          </p>
-        </div>
-      </div>
+      )}
 
-      {/* Teams Grid */}
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        border: '1px solid #e5e7eb',
-        padding: '20px'
-      }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>Teams Overview</h2>
-        
-        {teams.length === 0 ? (
-          <div style={{ padding: '20px', color: '#6b7280', textAlign: 'center' }}>No team data available</div>
-        ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '16px'
-          }}>
-            {teams.map((team) => (
-              <div
-                key={team.team_name}
-                onClick={() => {
-                  setSelectedTeam(team.team_name);
-                  if (authUser) fetchTeamDetails(authUser, team.team_name, startDate, endDate);
-                }}
-                style={{
-                  padding: '16px',
-                  border: `2px solid ${team.color}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  background: 'white',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedTeam === team.team_name ? `0 0 12px ${team.color}40` : 'none',
-                  opacity: 1,
-                  ':hover': {
-                    boxShadow: `0 0 12px ${team.color}40`
-                  }
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '12px'
-                }}>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: team.color }}>
-                    {team.team_name}
-                  </h3>
-                  <span style={{
-                    background: team.color,
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: 600
-                  }}>
-                    {team.total_questions}
-                  </span>
-                </div>
-
-                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '10px' }}>
-                  <p style={{ margin: '4px 0' }}>
-                    <strong>Lead:</strong> {team.lead || 'N/A'}
-                  </p>
-                  <p style={{ margin: '4px 0' }}>
-                    <strong>Members:</strong> {team.member_count} ({team.active_members_count} active)
-                  </p>
-                </div>
-
-                <div style={{
-                  background: '#f9fafb',
-                  padding: '8px',
-                  borderRadius: '4px',
-                  fontSize: '12px'
-                }}>
-                  <p style={{ margin: '2px 0', color: '#6b7280' }}>
-                    <strong>Unique Questions:</strong> {team.unique_questions}
-                  </p>
-                  {team.top_questions.length > 0 && (
-                    <p style={{ margin: '4px 0 2px 0', color: '#111827', fontWeight: 500 }}>Top: {team.top_questions[0].question.substring(0, 40)}...</p>
-                  )}
-                </div>
-              </div>
-            ))}
+      {/* Summary Stats */}
+      {teams.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Total Questions</div>
+            <div style={{ fontSize: '28px', fontWeight: '700' }}>
+              {teams.reduce((sum, t) => sum + t.total_questions, 0)}
+            </div>
           </div>
-        )}
-      </div>
+          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Total Teams</div>
+            <div style={{ fontSize: '28px', fontWeight: '700' }}>{teams.length}</div>
+          </div>
+          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Active Teams</div>
+            <div style={{ fontSize: '28px', fontWeight: '700' }}>
+              {teams.filter(t => t.total_questions > 0).length}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leaderboard */}
+      {teams.length > 0 ? (
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600' }}>Team Leaderboard</h2>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Rank</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Team</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Total Questions</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Unique</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Active Members</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teams.map((team, idx) => (
+                  <tr key={team.team_name} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: idx % 2 === 0 ? 'white' : '#fafafa' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '500' }}>{idx + 1}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '500' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '3px',
+                        backgroundColor: team.color,
+                        marginRight: '8px'
+                      }}></span>
+                      {team.team_name}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', textAlign: 'center', fontWeight: '600' }}>
+                      {team.total_questions}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', textAlign: 'center' }}>
+                      {team.unique_questions}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', textAlign: 'center' }}>
+                      {team.active_members_count}/{team.member_count}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => fetchTeamDetails(team.team_name)}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: '#0129ac',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : !fetching && !error ? (
+        <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+          No team data available for the selected period.
+        </div>
+      ) : null}
 
       {/* Team Details Modal */}
       {showTeamDetails && selectedTeamDetails && (
@@ -609,101 +340,67 @@ export default function TeamsAnalyticsPage() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+          backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'center',
+          alignItems: 'center',
           zIndex: 1000
-        }} onClick={() => setShowTeamDetails(false)}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'white',
-              borderRadius: '12px',
-              padding: '24px',
-              maxWidth: '800px',
-              width: '90%',
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px rgba(0,0,0,0.15)'
-            }}
-          >
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '24px',
+            maxWidth: '700px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{
-                margin: 0,
-                fontSize: '22px',
-                fontWeight: 700,
-                color: selectedTeamDetails.color
-              }}>
-                {selectedTeamDetails.team_name}
-              </h2>
+              <h2 style={{ fontSize: '20px', fontWeight: '700' }}>{selectedTeamDetails.team_name}</h2>
               <button
                 onClick={() => setShowTeamDetails(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#6b7280'
-                }}
+                style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}
               >
                 ×
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 4px 0', color: '#6b7280', fontSize: '12px' }}>Lead</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{selectedTeamDetails.lead}</p>
-              </div>
-              <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 4px 0', color: '#6b7280', fontSize: '12px' }}>Total Questions</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{selectedTeamDetails.team_total_questions}</p>
-              </div>
-              <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 4px 0', color: '#6b7280', fontSize: '12px' }}>Active Members</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{selectedTeamDetails.active_members}/{selectedTeamDetails.total_members}</p>
-              </div>
-              <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 4px 0', color: '#6b7280', fontSize: '12px' }}>Unique Questions</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{selectedTeamDetails.team_unique_questions}</p>
+            <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Lead</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{selectedTeamDetails.lead}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Total Members</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{selectedTeamDetails.total_members}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Active Members</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{selectedTeamDetails.active_members}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Total Questions</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{selectedTeamDetails.team_total_questions}</div>
+                </div>
               </div>
             </div>
 
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', marginTop: '20px' }}>Team Members</h3>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              maxHeight: '400px',
-              overflowY: 'auto'
-            }}>
-              {selectedTeamDetails.members.map((member) => (
-                <div key={member.email} style={{
+            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>Members</h3>
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {selectedTeamDetails.members.map((member, idx) => (
+                <div key={idx} style={{
                   padding: '12px',
-                  background: member.total_questions > 0 ? '#f9fafb' : '#f3f4f6',
-                  borderRadius: '8px',
-                  borderLeft: `4px solid ${selectedTeamDetails.color}`,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '4px',
+                  marginBottom: '8px'
                 }}>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: member.is_lead ? 600 : 500 }}>
-                      {member.name} {member.is_lead && '👑'}
-                    </p>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#6b7280' }}>{member.email}</p>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>
+                    {member.name}
+                    {member.is_lead && <span style={{ marginLeft: '8px', fontSize: '12px', backgroundColor: '#dbeafe', color: '#0129ac', padding: '2px 6px', borderRadius: '3px' }}>Lead</span>}
                   </div>
-                  <span style={{
-                    background: selectedTeamDetails.color,
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: 600
-                  }}>
-                    {member.total_questions}
-                  </span>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>{member.email}</div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Questions: {member.total_questions}</div>
                 </div>
               ))}
             </div>
@@ -713,4 +410,3 @@ export default function TeamsAnalyticsPage() {
     </div>
   );
 }
-

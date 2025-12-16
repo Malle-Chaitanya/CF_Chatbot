@@ -14,13 +14,11 @@ interface UserAnalytics {
   first_question_at: string;
   last_question_at: string;
   top_questions: Array<{ question: string; count: number }>;
-  metadata: Record<string, any>;
 }
 
 interface TopQuestion {
   question: string;
   times_asked: number;
-  percentage?: number;
 }
 
 interface MostActiveUser {
@@ -45,497 +43,326 @@ export default function AdminLangfuseAnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'questions'>('overview');
-  const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'this_week' | 'last_week' | 'all'>('today');
+  const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'all'>('today');
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [users, setUsers] = useState<UserAnalytics[]>([]);
   const [topQuestions, setTopQuestions] = useState<TopQuestion[]>([]);
   const [mostActiveUsers, setMostActiveUsers] = useState<MostActiveUser[]>([]);
+  const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
 
-  // Verify admin access on mount
+  // Check admin access on mount
   useEffect(() => {
-    const user = getCurrentUser();
-
-    if (!user) {
-      router.replace('/login?error=admin_only');
-      return;
+    async function checkAuth() {
+      try {
+        const user = await getCurrentUser();
+        if (!user || !isAdminEmail(user.email)) {
+          router.push('/login');
+          return;
+        }
+        setAuthUser(user);
+      } catch (err) {
+        console.error('Auth check failed:', err);
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
     }
-
-    if (!isAdminEmail(user.email)) {
-      router.replace('/login?error=admin_only');
-      return;
-    }
-
-    setAuthUser(user);
-    setLoading(false);
+    checkAuth();
   }, [router]);
 
-  // Fetch all analytics data with time filter
+  // Fetch all analytics data
   const fetchAnalytics = useCallback(
-    async (user: User, selectedTimeFilter?: string) => {
+    async (filter: string) => {
       setFetching(true);
       setError(null);
 
-      const filter = selectedTimeFilter || timeFilter;
-
       try {
-        // Fetch summary with time filter
+        const user = await getCurrentUser();
+        if (!user) {
+          setError('Not authenticated');
+          return;
+        }
+
+        const apiBase = getApiBase();
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+
+        if (user.access_token) {
+          headers['Authorization'] = `Bearer ${user.access_token}`;
+        }
+
+        // Fetch summary
         const summaryRes = await fetch(
-          `${getApiBase()}/analytics/langfuse/dashboard-summary?time_filter=${filter}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${user.access_token}`
-            }
-          }
+          `${apiBase}/analytics/langfuse/dashboard-summary?time_filter=${filter}`,
+          { headers, credentials: 'include' }
         );
 
         if (summaryRes.ok) {
-          const summaryData = await summaryRes.json();
-          if (summaryData.status === 'success') {
-            setSummary(summaryData.summary);
-            setMostActiveUsers(summaryData.most_active_users || []);
-            setTopQuestions(summaryData.top_questions || []);
+          const data = await summaryRes.json();
+          if (data.status === 'success') {
+            setSummary(data.summary);
+            setMostActiveUsers(data.most_active_users || []);
+            setTopQuestions(data.top_questions || []);
           }
         }
 
-        // Fetch all users with time filter
+        // Fetch users
         const usersRes = await fetch(
-          `${getApiBase()}/analytics/langfuse/users?time_filter=${filter}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${user.access_token}`
-            }
-          }
+          `${apiBase}/analytics/langfuse/users?time_filter=${filter}`,
+          { headers, credentials: 'include' }
         );
 
         if (usersRes.ok) {
-          const usersData = await usersRes.json();
-          if (usersData.status === 'success') {
-            setUsers(usersData.users || []);
+          const data = await usersRes.json();
+          if (data.status === 'success') {
+            setUsers(data.users || []);
           }
         }
+
+        setLastFetchTime(Date.now());
       } catch (err) {
-        setError((err as Error).message);
+        const message = err instanceof Error ? err.message : 'Failed to fetch analytics';
+        setError(message);
+        console.error('Analytics fetch error:', err);
       } finally {
         setFetching(false);
       }
     },
-    [timeFilter]
+    []
   );
 
-  // Fetch data after authentication
-  useEffect(() => {
-    if (!authUser) return;
-    fetchAnalytics(authUser);
-  }, [authUser, fetchAnalytics]);
-
-  const handleRefresh = () => {
-    if (!authUser) return;
-    fetchAnalytics(authUser);
+  // Handle filter change
+  const handleFilterChange = (filter: string) => {
+    setTimeFilter(filter as any);
+    fetchAnalytics(filter);
   };
+
+  // Initial fetch on auth
+  useEffect(() => {
+    if (!loading && authUser) {
+      fetchAnalytics(timeFilter);
+    }
+  }, [loading, authUser, timeFilter]);
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', fontFamily: 'Inter, system-ui, sans-serif' }}>
-        <p style={{ color: '#6b7280' }}>Checking admin access...</p>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>
+        Checking access...
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '6px' }}>🔍 Langfuse Analytics</h1>
-          <p style={{ color: '#6b7280', fontSize: '14px' }}>
-            User engagement and question analytics. Visible only to admins: {ADMIN_EMAILS.join(', ')}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => router.push('/chat/new')}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              color: '#111827',
-              fontWeight: 600
-            }}
-          >
-            Back to chats
-          </button>
-          <button
-            onClick={handleRefresh}
-            disabled={fetching}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: 'none',
-              background: '#0129ac',
-              color: 'white',
-              cursor: fetching ? 'not-allowed' : 'pointer',
-              fontWeight: 700,
-              opacity: fetching ? 0.6 : 1
-            }}
-          >
-            {fetching ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>Langfuse Analytics</h1>
+        <p style={{ color: '#6b7280', fontSize: '16px' }}>Track user questions and analytics</p>
       </div>
 
+      {/* Filter Buttons */}
+      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        {['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'all'].map((filter) => (
+          <button
+            key={filter}
+            onClick={() => handleFilterChange(filter)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: timeFilter === filter ? '2px solid #0129ac' : '1px solid #e5e7eb',
+              background: timeFilter === filter ? '#0129ac' : 'white',
+              color: timeFilter === filter ? 'white' : '#111827',
+              cursor: 'pointer',
+              fontWeight: timeFilter === filter ? '600' : '500',
+              fontSize: '14px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {filter === 'this_week' ? 'This Week' : filter === 'last_week' ? 'Last Week' : filter === 'this_month' ? 'This Month' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Fetch Time */}
+      {lastFetchTime && (
+        <div style={{ marginBottom: '16px', fontSize: '12px', color: '#9ca3af' }}>
+          Last updated: {new Date(lastFetchTime).toLocaleTimeString()}
+        </div>
+      )}
+
+      {/* Error Message */}
       {error && (
-        <div style={{ 
-          background: '#fef2f2', 
-          color: '#b91c1c', 
-          padding: '12px 14px', 
-          borderRadius: '10px', 
-          marginBottom: '20px', 
-          border: '1px solid #fecdd3' 
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: '#fee2e2',
+          border: '1px solid #fecaca',
+          borderRadius: '8px',
+          color: '#991b1b',
+          marginBottom: '24px'
         }}>
           Error: {error}
         </div>
       )}
 
+      {/* Loading State */}
+      {fetching && (
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: '#dbeafe',
+          border: '1px solid #93c5fd',
+          borderRadius: '8px',
+          color: '#1e40af',
+          marginBottom: '24px'
+        }}>
+          Loading analytics...
+        </div>
+      )}
+
       {/* Summary Cards */}
       {summary && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '30px'
-        }}>
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '12px',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-          }}>
-            <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 8px 0', fontWeight: 500 }}>Total Users</p>
-            <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0 }}>{summary.total_users}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Total Users</div>
+            <div style={{ fontSize: '28px', fontWeight: '700' }}>{summary.total_users}</div>
           </div>
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '12px',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-          }}>
-            <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 8px 0', fontWeight: 500 }}>Total Questions</p>
-            <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0 }}>{summary.total_questions}</p>
+          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Total Questions</div>
+            <div style={{ fontSize: '28px', fontWeight: '700' }}>{summary.total_questions}</div>
           </div>
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '12px',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-          }}>
-            <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 8px 0', fontWeight: 500 }}>Unique Questions</p>
-            <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0 }}>{summary.unique_questions}</p>
+          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Unique Questions</div>
+            <div style={{ fontSize: '28px', fontWeight: '700' }}>{summary.unique_questions}</div>
           </div>
-          <div style={{
-            background: 'white',
-            padding: '20px',
-            borderRadius: '12px',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-          }}>
-            <p style={{ color: '#6b7280', fontSize: '14px', margin: '0 0 8px 0', fontWeight: 500 }}>Avg Questions/User</p>
-            <p style={{ fontSize: '32px', fontWeight: 700, color: '#111827', margin: 0 }}>{summary.average_questions_per_user}</p>
+          <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Avg per User</div>
+            <div style={{ fontSize: '28px', fontWeight: '700' }}>{summary.average_questions_per_user.toFixed(2)}</div>
           </div>
         </div>
       )}
 
-      {/* Date Filter Buttons */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '20px',
-        flexWrap: 'wrap'
-      }}>
-        {(['today', 'yesterday', 'this_week', 'last_week', 'all'] as const).map((filter) => (
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid #e5e7eb' }}>
+        {['overview', 'users', 'questions'].map((tab) => (
           <button
-            key={filter}
-            onClick={() => {
-              setTimeFilter(filter);
-              if (authUser) fetchAnalytics(authUser, filter);
-            }}
+            key={tab}
+            onClick={() => setActiveTab(tab as any)}
             style={{
-              padding: '8px 14px',
-              borderRadius: '8px',
-              border: timeFilter === filter ? '2px solid #0129ac' : '1px solid #d1d5db',
-              background: timeFilter === filter ? '#0129ac' : 'white',
-              color: timeFilter === filter ? 'white' : '#111827',
+              padding: '12px 0',
+              borderBottom: activeTab === tab ? '2px solid #0129ac' : 'none',
+              background: 'none',
+              border: 'none',
+              color: activeTab === tab ? '#0129ac' : '#6b7280',
               cursor: 'pointer',
-              fontWeight: timeFilter === filter ? 600 : 500,
-              fontSize: '13px',
-              transition: 'all 0.2s ease'
+              fontWeight: activeTab === tab ? '600' : '500',
+              fontSize: '14px',
             }}
           >
-            {filter === 'today' && 'Today'}
-            {filter === 'yesterday' && 'Yesterday'}
-            {filter === 'this_week' && 'This Week'}
-            {filter === 'last_week' && 'Last 7 Days'}
-            {filter === 'all' && 'All Time'}
+            {tab === 'overview' ? 'Overview' : tab === 'users' ? 'Top Users' : 'Top Questions'}
           </button>
         ))}
       </div>
 
-      {/* Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '20px',
-        borderBottom: '2px solid #e5e7eb'
-      }}>
-        <button
-          onClick={() => setActiveTab('overview')}
-          style={{
-            padding: '12px 20px',
-            background: 'none',
-            border: 'none',
-            color: activeTab === 'overview' ? '#111827' : '#6b7280',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 500,
-            borderBottom: activeTab === 'overview' ? '3px solid #0129ac' : 'none',
-            transition: 'all 0.3s ease'
-          }}
-        >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('users')}
-          style={{
-            padding: '12px 20px',
-            background: 'none',
-            border: 'none',
-            color: activeTab === 'users' ? '#111827' : '#6b7280',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 500,
-            borderBottom: activeTab === 'users' ? '3px solid #0129ac' : 'none',
-            transition: 'all 0.3s ease'
-          }}
-        >
-          All Users ({users.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('questions')}
-          style={{
-            padding: '12px 20px',
-            background: 'none',
-            border: 'none',
-            color: activeTab === 'questions' ? '#111827' : '#6b7280',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 500,
-            borderBottom: activeTab === 'questions' ? '3px solid #0129ac' : 'none',
-            transition: 'all 0.3s ease'
-          }}
-        >
-          Top Questions
-        </button>
-      </div>
-
-      {/* Tab Content */}
-      <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '20px' }}>
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div>
-            {/* Most Active Users */}
-            <div style={{ marginBottom: '30px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>
-                Top 10 Most Active Users
-              </h2>
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  background: '#f9fafb',
-                  padding: '12px 14px',
-                  fontWeight: 700,
-                  color: '#111827',
-                  fontSize: '14px',
-                  borderBottom: '1px solid #e5e7eb'
-                }}>
-                  <div>Email</div>
-                  <div>Name</div>
-                  <div style={{ textAlign: 'right' }}>Questions</div>
-                </div>
-                {mostActiveUsers.length === 0 ? (
-                  <div style={{ padding: '16px', color: '#6b7280' }}>No data available.</div>
-                ) : (
-                  mostActiveUsers.map((user, idx) => (
-                    <div
-                      key={user.user_id}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(3, 1fr)',
-                        padding: '12px 14px',
-                        borderTop: '1px solid #e5e7eb',
-                        background: idx % 2 === 0 ? 'white' : '#f9fafb',
-                        fontSize: '14px'
-                      }}
-                    >
-                      <div style={{ color: '#111827' }}>{user.email}</div>
-                      <div style={{ color: '#111827' }}>{user.name}</div>
-                      <div style={{ color: '#111827', fontWeight: 600, textAlign: 'right' }}>{user.questions_asked}</div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Top Questions */}
-            <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>
-                Top 5 Questions
-              </h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {topQuestions.length === 0 ? (
-                  <div style={{ color: '#6b7280' }}>No data available.</div>
-                ) : (
-                  topQuestions.map((q, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        gap: '12px',
-                        padding: '12px 14px',
-                        background: '#f9fafb',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        alignItems: 'flex-start'
-                      }}
-                    >
-                      <span style={{
-                        fontSize: '18px',
-                        fontWeight: 700,
-                        color: '#0129ac',
-                        minWidth: '30px'
-                      }}>#{idx + 1}</span>
-                      <span style={{ flex: 1, color: '#111827', fontSize: '14px' }}>{q.question}</span>
-                      <span style={{
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        color: '#e74c3c',
-                        whiteSpace: 'nowrap'
-                      }}>×{q.times_asked}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+      {/* Overview Tab */}
+      {activeTab === 'overview' && mostActiveUsers.length > 0 && (
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600' }}>Most Active Users</h2>
           </div>
-        )}
-
-        {/* Users Tab */}
-        {activeTab === 'users' && (
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>
-              All Users ({users.length})
-            </h2>
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', overflowX: 'auto' }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, minmax(150px, 1fr))',
-                background: '#f9fafb',
-                padding: '12px 14px',
-                fontWeight: 700,
-                color: '#111827',
-                fontSize: '13px',
-                borderBottom: '1px solid #e5e7eb',
-                minWidth: '800px'
-              }}>
-                <div>Email</div>
-                <div>Name</div>
-                <div>Total Questions</div>
-                <div>First Question</div>
-                <div>Last Active</div>
-              </div>
-              {users.length === 0 ? (
-                <div style={{ padding: '16px', color: '#6b7280' }}>No users found.</div>
-              ) : (
-                users.map((user, idx) => (
-                  <div
-                    key={user.user_id}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(5, minmax(150px, 1fr))',
-                      padding: '12px 14px',
-                      borderTop: '1px solid #e5e7eb',
-                      background: idx % 2 === 0 ? 'white' : '#f9fafb',
-                      fontSize: '13px',
-                      minWidth: '800px'
-                    }}
-                  >
-                    <div style={{ color: '#111827' }}>{user.email}</div>
-                    <div style={{ color: '#111827' }}>{user.name}</div>
-                    <div style={{ color: '#111827', fontWeight: 600 }}>{user.total_questions}</div>
-                    <div style={{ color: '#6b7280' }}>
-                      {user.first_question_at ? new Date(user.first_question_at).toLocaleDateString() : '—'}
-                    </div>
-                    <div style={{ color: '#6b7280' }}>
-                      {user.last_question_at ? new Date(user.last_question_at).toLocaleDateString() : '—'}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Rank</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Email</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Questions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mostActiveUsers.map((user, idx) => (
+                  <tr key={user.user_id} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: idx % 2 === 0 ? 'white' : '#fafafa' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '500' }}>{idx + 1}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px' }}>{user.email}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', textAlign: 'center', fontWeight: '600' }}>
+                      {user.questions_asked}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Questions Tab */}
-        {activeTab === 'questions' && (
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>
-              Top Questions Across All Users
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {topQuestions.length === 0 ? (
-                <div style={{ color: '#6b7280' }}>No data available.</div>
-              ) : (
-                topQuestions.map((q, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      gap: '15px',
-                      padding: '15px',
-                      background: '#f9fafb',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                      alignItems: 'flex-start'
-                    }}
-                  >
-                    <div style={{
-                      fontSize: '18px',
-                      fontWeight: 700,
-                      color: '#0129ac',
-                      minWidth: '40px'
-                    }}>#{idx + 1}</div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: '0 0 6px 0', color: '#111827', fontSize: '14px', fontWeight: 500 }}>
-                        {q.question}
-                      </p>
-                      <p style={{ margin: 0, color: '#6b7280', fontSize: '12px' }}>
-                        Asked {q.times_asked} times {q.percentage ? `(${q.percentage}% of total)` : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+      {/* Users Tab */}
+      {activeTab === 'users' && users.length > 0 && (
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600' }}>All Users</h2>
           </div>
-        )}
-      </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Email</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Questions</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Last Asked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.slice(0, 20).map((user, idx) => (
+                  <tr key={user.user_id} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: idx % 2 === 0 ? 'white' : '#fafafa' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '14px' }}>{user.email}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', textAlign: 'center', fontWeight: '500' }}>
+                      {user.total_questions}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', color: '#6b7280' }}>
+                      {new Date(user.last_question_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Questions Tab */}
+      {activeTab === 'questions' && topQuestions.length > 0 && (
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600' }}>Top Questions</h2>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Rank</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Question</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#6b7280' }}>Times Asked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topQuestions.map((q, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: idx % 2 === 0 ? 'white' : '#fafafa' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '500' }}>{idx + 1}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px' }}>{q.question.substring(0, 100)}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px', textAlign: 'center', fontWeight: '600' }}>
+                      {q.times_asked}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!fetching && !summary && !error && (
+        <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+          No data available for the selected period.
+        </div>
+      )}
     </div>
   );
 }
-

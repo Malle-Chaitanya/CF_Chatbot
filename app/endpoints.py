@@ -2990,7 +2990,7 @@ async def clear_corrected_responses(current_user: dict = Depends(require_admin))
 
 @router.get("/analytics/langfuse/teams/summary")
 async def get_teams_analytics_summary(
-    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
+    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|this_month|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
     """
@@ -3012,10 +3012,10 @@ async def get_teams_analytics_summary(
         if not langfuse_client:
             return {"error": "Langfuse client not initialized", "status": "error"}
         
-        # Calculate date range
+        # Calculate date range based on time_filter
         now = datetime.now(timezone.utc)
-        start_time = now
-        end_time = now
+        start_time = None
+        end_time = None
         
         if time_filter == "today":
             start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -3031,9 +3031,10 @@ async def get_teams_analytics_summary(
         elif time_filter == "last_week":
             start_time = now - timedelta(days=7)
             end_time = now
-        else:
-            start_time = None
-            end_time = None
+        elif time_filter == "this_month":
+            start_time = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_time = now
+        # For "all", start_time and end_time remain None
         
         # Initialize team data structure
         teams_data = {}
@@ -3055,26 +3056,28 @@ async def get_teams_analytics_summary(
         # Fetch traces and organize by team
         page = 1
         batch_limit = 100
-        max_pages = 10 if time_filter != "all" else 30
+        # Reduce max_pages to avoid hitting rate limits and timeouts
+        max_pages = 3 if time_filter in ["today", "yesterday"] else (5 if time_filter != "all" else 10)
         
         async with httpx.AsyncClient() as client:
             while page <= max_pages:
                 try:
                     params = {
                         "page": page,
-                        "limit": batch_limit
+                        "limit": batch_limit,
+                        "orderBy[createdAt]": "DESC"
                     }
                     
                     if start_time:
-                        params["fromTimestamp"] = start_time.isoformat()
+                        params["createdAt[gte]"] = start_time.isoformat() + "Z"
                     if end_time:
-                        params["toTimestamp"] = end_time.isoformat()
+                        params["createdAt[lte]"] = end_time.isoformat() + "Z"
                     
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
                         auth=(LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY),
-                        timeout=30.0
+                        timeout=45.0
                     )
                     
                     if response.status_code == 429:
@@ -3098,20 +3101,25 @@ async def get_teams_analytics_summary(
                         if user_email:
                             # Find which team this user belongs to
                             user_email_str = str(user_email) if isinstance(user_email, list) else user_email
-                            team_name = get_team_by_member_email(user_email_str)
-                            
-                            if team_name in teams_data:
-                                teams_data[team_name]["active_members"].add(user_email_str)
-                                
-                                if question:
-                                    teams_data[team_name]["total_questions"] += 1
-                                    teams_data[team_name]["questions_list"].append(str(question))
+                            # Ensure user_email_str is not None before calling get_team_by_member_email
+                            if user_email_str and user_email_str.strip():
+                                try:
+                                    team_name = get_team_by_member_email(user_email_str)
+                                    
+                                    if team_name in teams_data:
+                                        teams_data[team_name]["active_members"].add(user_email_str)
+                                        
+                                        if question:
+                                            teams_data[team_name]["total_questions"] += 1
+                                            teams_data[team_name]["questions_list"].append(str(question))
+                                except Exception as e:
+                                    print(f"[WARN] Error getting team for email {user_email_str}: {e}")
                     
                     if len(traces) < batch_limit:
                         break
                     
                     page += 1
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(1.0)  # Increased from 0.5 to respect rate limits
                     
                 except Exception as e:
                     print(f"[ERROR] Error fetching traces: {e}")
@@ -4534,251 +4542,6 @@ async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
             
     except Exception as e:
         return {"error": f"OAuth callback failed: {str(e)}"}
-
-
-# ============================================================================
-# TEAM-WISE ANALYTICS ENDPOINTS
-# ============================================================================
-
-@router.get("/analytics/langfuse/teams/summary")
-async def get_langfuse_teams_summary(
-    start_date: str = Query(None, description="Start date in YYYY-MM-DD format"),
-    end_date: str = Query(None, description="End date in YYYY-MM-DD format"),
-    time_filter: str = Query(None, description="(Legacy) Filter by time: today, yesterday, this_week, last_week, all"),
-    current_user: dict = Depends(require_restricted_admin)
-):
-    """
-    Get team-wise analytics summary from Langfuse traces.
-    Returns aggregated statistics for all 8 teams.
-    Supports both date range (start_date/end_date) and preset filters (time_filter).
-    """
-    try:
-        print(f"[TEAMS] Starting teams summary fetch: start_date={start_date}, end_date={end_date}, time_filter={time_filter}")
-        from app.langfuse_integration import langfuse_client
-        from app.models.teams import TEAMS, get_team_for_member, MEMBER_TO_TEAM
-        from datetime import timedelta
-        
-        if not langfuse_client:
-            return {"error": "Langfuse client not initialized", "status": "error"}
-        
-        # Calculate time range based on start_date/end_date or legacy time_filter
-        start_time = None
-        end_time = datetime.utcnow()
-        max_pages = 30
-        request_timeout = 60.0
-        
-        # Use custom date range if provided
-        if start_date and end_date:
-            try:
-                start_time = datetime.strptime(start_date, "%Y-%m-%d").replace(hour=0, minute=0, second=0, microsecond=0)
-                end_time = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, microsecond=999999)
-                
-                # Adjust page limits based on date range width
-                date_diff = (end_time - start_time).days
-                if date_diff <= 1:
-                    max_pages = 10
-                    request_timeout = 30.0
-                elif date_diff <= 7:
-                    max_pages = 15
-                    request_timeout = 45.0
-                elif date_diff <= 30:
-                    max_pages = 20
-                    request_timeout = 60.0
-            except ValueError:
-                return {"error": "Invalid date format. Use YYYY-MM-DD", "status": "error"}
-        
-        # Fallback to legacy time_filter
-        elif time_filter == "today":
-            start_time = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            max_pages = 10
-            request_timeout = 30.0
-        elif time_filter == "yesterday":
-            start_time = (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - 
-                         timedelta(days=1))
-            end_time = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            max_pages = 10
-            request_timeout = 30.0
-        elif time_filter == "this_week":
-            start_time = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
-            start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
-            max_pages = 15
-            request_timeout = 45.0
-        elif time_filter == "last_week":
-            start_time = datetime.utcnow() - timedelta(days=7)
-            max_pages = 20
-            request_timeout = 45.0
-        
-        # Initialize team data structure
-        team_stats = {}
-        for team_name in TEAMS.keys():
-            try:
-                team_info = TEAMS[team_name]
-                lead = team_info.get("Lead")
-                members = team_info.get("Members", [])
-                member_count = len([m for m in members if m]) if members else 0
-                
-                team_stats[team_name] = {
-                    "team_name": team_name,
-                    "lead": lead,
-                    "lead_email": "",
-                    "member_count": member_count,
-                    "active_members_count": 0,
-                    "color": get_team_color(team_name),
-                    "total_questions": 0,
-                    "unique_questions": 0,
-                    "top_questions": [],
-                    "questions_list": [],
-                    "active_members": set()
-                }
-            except Exception as e:
-                print(f"[WARN] Error initializing team {team_name}: {e}")
-                continue
-        
-        # Fetch traces from Langfuse
-        page = 1
-        batch_limit = 100
-        
-        async with httpx.AsyncClient() as client:
-            from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
-            
-            while page <= max_pages:
-                try:
-                    params = {
-                        "page": page,
-                        "limit": batch_limit,
-                        "orderBy[createdAt]": "DESC"
-                    }
-                    if start_time:
-                        params["createdAt[gte]"] = start_time.isoformat() + "Z"
-                    if end_time:
-                        params["createdAt[lte]"] = end_time.isoformat() + "Z"
-                    
-                    response = await client.get(
-                        f"{LANGFUSE_HOST}/api/public/traces",
-                        params=params,
-                        auth=(LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY),
-                        timeout=request_timeout
-                    )
-                    
-                    if response.status_code == 429:
-                        print(f"[WARNING] Langfuse rate limited at page {page}")
-                        break
-                    
-                    response.raise_for_status()
-                    
-                    traces_response = response.json()
-                    traces = traces_response.get("data", [])
-                    
-                    if not traces:
-                        break
-                    
-                    for trace in traces:
-                        try:
-                            user_id = trace.get("userId", "")
-                            metadata = trace.get("metadata", {})
-                            question = trace.get("input", "")
-                            
-                            # Extract user info safely
-                            user_email = trace.get("metadata", {}).get("user_email")
-                            user_name = trace.get("metadata", {}).get("user_name", "Unknown")
-                            
-                            # Convert to strings safely
-                            user_email = str(user_email) if user_email else ""
-                            user_name = str(user_name) if user_name else "Unknown"
-                            
-                            # Find team for this user
-                            team_name = None
-                            
-                            # Try to match by email against all team member emails
-                            if user_email and user_email != "":
-                                try:
-                                    email_lower = user_email.lower()
-                                    # Direct lookup using the get_team_by_member_email function
-                                    from app.models.teams import get_team_by_member_email
-                                    found_team = get_team_by_member_email(email_lower)
-                                    if found_team and found_team != "Unassigned":
-                                        team_name = found_team
-                                except Exception as match_err:
-                                    print(f"[WARN] Error matching email {user_email}: {match_err}")
-                            
-                            # Assign to Unknown team if not found (optional)
-                            if not team_name or team_name == "Unknown" or team_name == "Unassigned":
-                                continue
-                            
-                            # Update team stats
-                            if team_name in team_stats and question:
-                                team_stats[team_name]["total_questions"] += 1
-                                team_stats[team_name]["questions_list"].append(question)
-                                team_stats[team_name]["active_members"].add(user_email or user_name)
-                                
-                                # Update lead email if this is the lead
-                                lead = TEAMS[team_name].get("Lead")
-                                if user_email and lead and lead == user_name:
-                                    team_stats[team_name]["lead_email"] = user_email
-                        except Exception as trace_err:
-                            print(f"[WARN] Error processing trace: {trace_err}")
-                            continue
-                    
-                    if len(traces) < batch_limit:
-                        break
-                    
-                    page += 1
-                    await asyncio.sleep(0.5)
-                    
-                except httpx.RequestError as e:
-                    print(f"[ERROR] Network error during Langfuse API call: {e}")
-                    break
-                except httpx.HTTPStatusError as e:
-                    print(f"[ERROR] Langfuse API returned HTTP error {e.response.status_code}")
-                    break
-                except Exception as e:
-                    print(f"[ERROR] Langfuse API error: {e}")
-                    break
-        
-        # Process questions and calculate unique counts
-        teams_list = []
-        for team_name, stats in team_stats.items():
-            stats["active_members_count"] = len(stats["active_members"])
-            
-            # Calculate unique questions
-            if stats["questions_list"]:
-                unique_questions = set(stats["questions_list"])
-                stats["unique_questions"] = len(unique_questions)
-                
-                # Get top 5 questions
-                question_counts = Counter(stats["questions_list"])
-                top_questions = question_counts.most_common(5)
-                stats["top_questions"] = [
-                    {"question": q, "count": c} for q, c in top_questions
-                ]
-            
-            # Remove temporary fields
-            del stats["questions_list"]
-            del stats["active_members"]
-            
-            teams_list.append(stats)
-        
-        # Sort by total questions descending
-        teams_list.sort(key=lambda x: x["total_questions"], reverse=True)
-        
-        total_questions = sum(t["total_questions"] for t in teams_list)
-        active_teams = sum(1 for t in teams_list if t["total_questions"] > 0)
-        
-        return {
-            "status": "success",
-            "time_filter": time_filter,
-            "teams": teams_list,
-            "total_teams": len(TEAMS),
-            "total_questions": total_questions,
-            "total_active_teams": active_teams
-        }
-        
-    except Exception as e:
-        print(f"[ERROR] Team analytics fetch failed: {e}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
 
 
 @router.get("/analytics/langfuse/teams/details")
