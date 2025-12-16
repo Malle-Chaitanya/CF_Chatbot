@@ -120,14 +120,30 @@ export default function TeamsAnalyticsPage() {
         if (!response.ok) {
           const errorText = await response.text();
           console.error('[Teams Fetch] Error response:', errorText);
-          throw new Error(`HTTP ${response.status}: ${errorText}`);
+          throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 200)}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          console.error('[Teams Fetch] Invalid content type:', contentType);
+          throw new Error(`Invalid response type: ${contentType}`);
         }
 
         const data = await response.json();
         console.log('[Teams Fetch] Success! Data:', data);
-        setTeams(data.teams || []);
+        
+        if (!data.teams && !Array.isArray(data)) {
+          console.error('[Teams Fetch] Invalid response format:', data);
+          throw new Error('Invalid response format from server');
+        }
+        
+        setTeams(data.teams || data || []);
         setLastFetchTime(Date.now());
       } catch (fetchErr) {
+        if (fetchErr instanceof TypeError && fetchErr.message.includes('Failed to fetch')) {
+          console.error('[Teams Fetch] Network error (CORS or connection issue):', fetchErr);
+          throw new Error('Failed to connect to server. Check if backend is running and CORS is configured correctly.');
+        }
         console.error('[Teams Fetch] Network error:', fetchErr);
         throw fetchErr;
       }

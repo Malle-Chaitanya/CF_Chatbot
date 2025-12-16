@@ -3094,26 +3094,29 @@ async def get_teams_analytics_summary(
                     
                     # Process traces and assign to teams
                     for trace in traces:
-                        metadata = trace.get("metadata", {})
-                        user_email = metadata.get("user_email")
-                        question = trace.get("input", "")
-                        
-                        if user_email:
-                            # Find which team this user belongs to
-                            user_email_str = str(user_email) if isinstance(user_email, list) else user_email
-                            # Ensure user_email_str is not None before calling get_team_by_member_email
-                            if user_email_str and user_email_str.strip():
-                                try:
-                                    team_name = get_team_by_member_email(user_email_str)
-                                    
-                                    if team_name in teams_data:
-                                        teams_data[team_name]["active_members"].add(user_email_str)
+                        try:
+                            metadata = trace.get("metadata", {})
+                            user_email = metadata.get("user_email")
+                            question = trace.get("input", "")
+                            
+                            if user_email:
+                                # Find which team this user belongs to
+                                user_email_str = str(user_email) if isinstance(user_email, list) else user_email
+                                # Ensure user_email_str is not None before calling get_team_by_member_email
+                                if user_email_str and isinstance(user_email_str, str) and user_email_str.strip():
+                                    try:
+                                        team_name = get_team_by_member_email(user_email_str)
                                         
-                                        if question:
-                                            teams_data[team_name]["total_questions"] += 1
-                                            teams_data[team_name]["questions_list"].append(str(question))
-                                except Exception as e:
-                                    print(f"[WARN] Error getting team for email {user_email_str}: {e}")
+                                        if team_name in teams_data:
+                                            teams_data[team_name]["active_members"].add(user_email_str)
+                                            
+                                            if question:
+                                                teams_data[team_name]["total_questions"] += 1
+                                                teams_data[team_name]["questions_list"].append(str(question))
+                                    except Exception as e:
+                                        print(f"[WARN] Error getting team for email {user_email_str}: {e}")
+                        except Exception as trace_err:
+                            print(f"[WARN] Error processing trace: {trace_err}")
                     
                     if len(traces) < batch_limit:
                         break
@@ -3226,7 +3229,7 @@ async def get_team_details(
         
         # Get all team member emails
         all_team_members_emails = get_all_team_members_emails()
-        team_emails = [e.lower() for e in all_team_members_emails.get(team_name, [])]
+        team_emails = [e.lower() for e in all_team_members_emails.get(team_name, []) if e and isinstance(e, str)]
         
         # Initialize stats for all team members
         for member in team_info.get("members", []):
