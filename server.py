@@ -113,10 +113,19 @@ app = FastAPI(lifespan=lifespan)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://ai.cloudfuze.com",
+        "https://ai.cloudfuze.com",
+    ],
     allow_credentials=True,  # Enable credentials for OAuth
-    allow_methods=["*"],  # Allow all methods
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose all headers to frontend
+    max_age=3600,  # Cache CORS preflight responses for 1 hour
 )
 
 # Add a simple health check endpoint
