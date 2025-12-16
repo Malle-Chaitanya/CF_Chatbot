@@ -93,14 +93,18 @@ export default function TeamsAnalyticsPage() {
         headers['Authorization'] = `Bearer ${user.access_token}`;
       }
 
-      const response = await fetch(
-        `${apiBase}/analytics/langfuse/teams/summary?time_filter=${filter}`,
-        {
-          method: 'GET',
-          headers,
-          credentials: 'include',
-        }
-      );
+      const url = `${apiBase}/analytics/langfuse/teams/summary?time_filter=${filter}`;
+      console.log('[Teams Fetch] URL:', url);
+      console.log('[Teams Fetch] Headers:', headers);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+        signal: AbortSignal.timeout(60000), // 60 second timeout
+      });
+
+      console.log('[Teams Fetch] Status:', response.status);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);

@@ -92,11 +92,17 @@ export default function AdminLangfuseAnalyticsPage() {
           headers['Authorization'] = `Bearer ${user.access_token}`;
         }
 
+        const fetchOptions = {
+          headers,
+          credentials: 'include' as const,
+          signal: AbortSignal.timeout(60000), // 60 second timeout
+        };
+
         // Fetch summary
-        const summaryRes = await fetch(
-          `${apiBase}/analytics/langfuse/dashboard-summary?time_filter=${filter}`,
-          { headers, credentials: 'include' }
-        );
+        const summaryUrl = `${apiBase}/analytics/langfuse/dashboard-summary?time_filter=${filter}`;
+        console.log('[Analytics Fetch] Summary URL:', summaryUrl);
+        
+        const summaryRes = await fetch(summaryUrl, fetchOptions);
 
         if (summaryRes.ok) {
           const data = await summaryRes.json();
@@ -108,10 +114,8 @@ export default function AdminLangfuseAnalyticsPage() {
         }
 
         // Fetch users
-        const usersRes = await fetch(
-          `${apiBase}/analytics/langfuse/users?time_filter=${filter}`,
-          { headers, credentials: 'include' }
-        );
+        const usersUrl = `${apiBase}/analytics/langfuse/users?time_filter=${filter}`;
+        const usersRes = await fetch(usersUrl, fetchOptions);
 
         if (usersRes.ok) {
           const data = await usersRes.json();
