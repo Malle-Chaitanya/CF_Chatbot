@@ -3172,9 +3172,9 @@ async def get_teams_analytics_summary(
         return {"error": str(e), "status": "error"}
 
 
-@router.get("/analytics/langfuse/teams/details")
+@router.get("/analytics/langfuse/teams/details/{team_name}")
 async def get_team_details(
-    team_name: str = Query(..., description="Team name"),
+    team_name: str,
     time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
@@ -4547,17 +4547,24 @@ async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
         return {"error": f"OAuth callback failed: {str(e)}"}
 
 
-@router.get("/analytics/langfuse/teams/details")
-async def get_langfuse_team_details(
+# DUPLICATE ENDPOINT REMOVED - See /analytics/langfuse/teams/details/{team_name} instead
+
+
+# DEPRECATED: This duplicate endpoint was removed. Use /analytics/langfuse/teams/details/{team_name} instead
+"""
+def get_langfuse_team_details_OLD_REMOVED(
     team_name: str = Query(..., description="Team name"),
     start_date: str = Query(None, description="Start date in YYYY-MM-DD format"),
     end_date: str = Query(None, description="End date in YYYY-MM-DD format"),
     time_filter: str = Query(None, description="(Legacy) Filter by time: today, yesterday, this_week, last_week, all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
-    """
-    Get detailed analytics for a specific team including all members and their stats.
-    Supports both date range (start_date/end_date) and preset filters (time_filter).
+    # GET DETAILED ANALYTICS FOR A SPECIFIC TEAM INCLUDING ALL MEMBERS AND THEIR STATS
+    # SUPPORTS BOTH DATE RANGE (START_DATE/END_DATE) AND PRESET FILTERS (TIME_FILTER)
+    # OLD CODE REMOVED - NOT USED
+"""
+    # OLD DEPRECATED CODE - REMOVED
+    pass
     """
     try:
         from app.langfuse_integration import langfuse_client
