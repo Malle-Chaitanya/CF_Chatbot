@@ -54,9 +54,9 @@ export default function TeamsAnalyticsPage() {
 
   // Check admin access on mount
   useEffect(() => {
-    async function checkAuth() {
+    function checkAuth() {
       try {
-        const user = await getCurrentUser();
+        const user = getCurrentUser(); // NOT async!
         if (!user || !isAdminEmail(user.email)) {
           router.push('/login');
           return;
@@ -78,13 +78,19 @@ export default function TeamsAnalyticsPage() {
       setFetching(true);
       setError(null);
 
-      const user = await getCurrentUser();
+      console.log('[Teams Fetch] Starting fetch with filter:', filter);
+      
+      const user = getCurrentUser(); // NOT async!
+      console.log('[Teams Fetch] Got user:', user?.email);
+      
       if (!user) {
         setError('Not authenticated');
+        console.error('[Teams Fetch] No user found');
         return;
       }
 
       const apiBase = getApiBase();
+      console.log('[Teams Fetch] API Base:', apiBase);
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
@@ -94,25 +100,37 @@ export default function TeamsAnalyticsPage() {
       }
 
       const url = `${apiBase}/analytics/langfuse/teams/summary?time_filter=${filter}`;
-      console.log('[Teams Fetch] URL:', url);
+      console.log('[Teams Fetch] Attempting to fetch from:', url);
       console.log('[Teams Fetch] Headers:', headers);
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-        credentials: 'include',
-        signal: AbortSignal.timeout(60000), // 60 second timeout
-      });
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-      console.log('[Teams Fetch] Status:', response.status);
+        const response = await fetch(url, {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        clearTimeout(timeoutId);
+        console.log('[Teams Fetch] Response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[Teams Fetch] Error response:', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('[Teams Fetch] Success! Data:', data);
+        setTeams(data.teams || []);
+        setLastFetchTime(Date.now());
+      } catch (fetchErr) {
+        console.error('[Teams Fetch] Network error:', fetchErr);
+        throw fetchErr;
       }
-
-      const data = await response.json();
-      setTeams(data.teams || []);
-      setLastFetchTime(Date.now());
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch team analytics';
       setError(message);
@@ -125,7 +143,7 @@ export default function TeamsAnalyticsPage() {
   // Fetch team details
   const fetchTeamDetails = useCallback(async (teamName: string) => {
     try {
-      const user = await getCurrentUser();
+      const user = getCurrentUser(); // NOT async!
       if (!user) return;
 
       const apiBase = getApiBase();

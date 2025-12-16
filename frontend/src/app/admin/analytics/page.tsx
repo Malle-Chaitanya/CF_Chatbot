@@ -52,9 +52,9 @@ export default function AdminLangfuseAnalyticsPage() {
 
   // Check admin access on mount
   useEffect(() => {
-    async function checkAuth() {
+    function checkAuth() {
       try {
-        const user = await getCurrentUser();
+        const user = getCurrentUser(); // NOT async!
         if (!user || !isAdminEmail(user.email)) {
           router.push('/login');
           return;
@@ -77,9 +77,10 @@ export default function AdminLangfuseAnalyticsPage() {
       setError(null);
 
       try {
-        const user = await getCurrentUser();
+        const user = getCurrentUser(); // NOT async!
         if (!user) {
           setError('Not authenticated');
+          console.error('[Analytics] No user found in localStorage');
           return;
         }
 
