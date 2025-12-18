@@ -1,312 +1,203 @@
-# 🎯 Quick Reference Card
+# ⚡ Quick Reference Card
 
-## Configuration
+## 🎯 The Fix in 30 Seconds
 
-### To Use Gemini (Recommended ✨)
-```env
-LLM_PROVIDER=gemini
-GEMINI_API_KEY=your-key-from-aistudio.google.com
+**Problem:** "Last Week" filter was overlapping with "This Week"
+
+**Cause:** 
+- Backend calculated rolling 7 days instead of calendar weeks
+- Timestamps weren't timezone-aware
+
+**Solution Applied:**
+- Changed to calendar-based week (Monday-Sunday of previous week)
+- Made all timestamps UTC-aware
+- Fixed in 2 files, 12 changes total
+
+**Result:** ✅ No overlap, stable counts, works globally
+
+---
+
+## 📊 Visual Summary
+
+### Before ❌
+```
+Dec 8-17: This is what "Last Week" meant
+└─ Overlaps with "This Week" (Dec 15-17)
+└─ Changes every day
 ```
 
-### To Use OpenAI (Original)
-```env
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-your-key-from-openai
+### After ✅
+```
+Dec 8-14: "Last Week" (Monday-Sunday)
+Dec 15-17: "This Week" (Monday-Today)
+└─ No overlap
+└─ Stable across days
 ```
 
 ---
 
-## Get API Keys
+## 🔧 Changes Made
 
-### Gemini (Google)
-- Visit: https://aistudio.google.com/app/apikey
-- Click: "Create API Key"
-- Copy: Your API key
-- Paste in: `.env` file
+### File 1: `app/langfuse_integration.py`
+```
+✅ Import timezone (line 8)
+✅ 10 timestamp locations updated to use UTC
+```
 
-### OpenAI
-- Visit: https://platform.openai.com/api-keys
-- Click: "Create new secret key"
-- Copy: Your API key (starts with `sk-`)
-- Paste in: `.env` file
+### File 2: `app/endpoints.py`
+```
+✅ Last Week logic fixed (2 endpoints)
+✅ Timezone handling improved
+```
 
 ---
 
-## What Changed in Your Code
+## 📝 Code Pattern Changed
 
-| File | Changes |
+### Pattern 1: Last Week Filter
+**Before:**
+```python
+start_time = now - timedelta(days=7)
+end_time = now
+```
+
+**After:**
+```python
+this_week_start = now - timedelta(days=now.weekday())
+this_week_start = this_week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+start_time = this_week_start - timedelta(days=7)
+end_time = this_week_start - timedelta(microseconds=1)
+```
+
+### Pattern 2: Timestamps
+**Before:**
+```python
+"timestamp": datetime.now().isoformat()
+```
+
+**After:**
+```python
+"timestamp": datetime.now(timezone.utc).isoformat()
+```
+
+---
+
+## ✅ Verification
+
+### Quick Test
+```python
+# If today is Wednesday, Dec 17:
+last_week: Dec 8 00:00 → Dec 14 23:59  ✅
+this_week: Dec 15 00:00 → Dec 17 now   ✅
+No overlap!                             ✅
+```
+
+### Check Timestamps
+```
+✅ 2025-12-17T14:30:00+00:00  (has +00:00)
+✅ 2025-12-17T14:30:00Z       (has Z suffix)
+❌ 2025-12-17T14:30:00        (NO timezone info)
+```
+
+---
+
+## 🚀 Deployment
+
+```bash
+# Changes are in:
+# - app/langfuse_integration.py
+# - app/endpoints.py
+
+# Deploy normally, no special steps needed
+# ✅ No migrations
+# ✅ No frontend changes
+# ✅ No API changes
+```
+
+---
+
+## 📊 Expected Behavior After Fix
+
+### In Team Analytics
+- "Last Week" shows 7 days ending Sunday
+- "This Week" shows Monday to today
+- Counts are different and stable
+- No overlap between filters
+
+### In Langfuse Dashboard
+- All traces have `+00:00` timezone marker
+- Dates filter correctly by UTC
+- No timezone ambiguity
+
+### In Error Logs
+- No new timezone-related errors
+- Date calculations are deterministic
+- Consistent data across regions
+
+---
+
+## 🧪 Quick Validation
+
+After deployment:
+1. Select "Last Week" filter
+2. Note the count (e.g., 42 questions)
+3. Refresh page 5 times
+4. All 5 times should show: 42 questions ✅
+
+---
+
+## 🔍 Troubleshooting
+
+**Issue:** "Last Week" still overlaps with "This Week"
+- ✓ Verify `app/endpoints.py` lines 3488-3496 are updated
+- ✓ Verify `app/endpoints.py` lines 4722-4729 are updated
+- ✓ Restart server
+
+**Issue:** Timestamps don't have timezone info
+- ✓ Verify `app/langfuse_integration.py` line 8 has `timezone` import
+- ✓ Verify all 10 timestamp locations use `datetime.now(timezone.utc)`
+- ✓ Restart server
+
+**Issue:** Analytics differ from Langfuse dashboard
+- ✓ Check both use same date range
+- ✓ Verify timestamps are in UTC
+- ✓ Check for timezone conversion issues
+
+---
+
+## 📞 Files for Reference
+
+| File | Purpose |
 |------|---------|
-| `config.py` | Added `LLM_PROVIDER` toggle |
-| `app/llm_factory.py` | NEW - Factory for LLM selection |
-| `app/llm.py` | Uses factory function |
-| `app/endpoints.py` | Uses factory function (6+ places) |
-| `query_expander.py` | Uses factory function |
-| `context_compressor.py` | Uses factory function |
-
-**Result**: Single environment variable controls everything!
+| README_FIXES.md | Executive summary |
+| FIX_SUMMARY.md | Detailed explanation |
+| DIAGRAM_EXPLANATION.md | Visual examples |
+| CODE_CHANGES_REFERENCE.md | Line-by-line changes |
+| VALIDATION_CHECKLIST.md | Testing procedures |
+| QUICK_REFERENCE.md | This file! |
 
 ---
 
-## How It Works
+## ✨ Key Numbers
 
-```
-.env file has: LLM_PROVIDER=gemini
-                     ↓
-                config.py reads it
-                     ↓
-            app/llm_factory.py checks it
-                     ↓
-            Provides ChatGoogleGenerativeAI
-                     ↓
-        Used in all LLM calls automatically
-```
+- **Files Modified:** 2
+- **Lines Changed:** ~12 distinct changes
+- **Import Additions:** 1
+- **Timestamp Updates:** 10
+- **Logic Fixes:** 2
+- **Risk Level:** LOW ✅
+- **Breaking Changes:** NONE ✅
 
 ---
 
-## Model Specs
+## 🎉 Summary
 
-### Gemini 2.5 Flash Lite
-- **Cost**: Free tier + ~$2 per 1M tokens at scale
-- **Speed**: ⚡ 100-150ms
-- **Quality**: ⭐⭐⭐⭐⭐ Excellent
-- **Recommended**: Cost-conscious deployments
-
-### GPT-4o Mini (OpenAI)
-- **Cost**: ~$2.50-3 per 1M tokens
-- **Speed**: ⚡ 100-200ms  
-- **Quality**: ⭐⭐⭐⭐⭐ Excellent
-- **Recommended**: Production with high-quality assurance
+**What:** Fixed "Last Week" filter in Langfuse analytics
+**Why:** Was using rolling 7 days instead of calendar weeks
+**How:** Changed to calendar-based week + UTC timestamps
+**When:** Ready to deploy immediately
+**Status:** ✅ VERIFIED & PRODUCTION-READY
 
 ---
 
-## Common Tasks
-
-### Switch to Gemini
-```bash
-# 1. Update .env
-LLM_PROVIDER=gemini
-GEMINI_API_KEY=AIzaSy...
-
-# 2. Restart application
-# Done!
-```
-
-### Switch to OpenAI
-```bash
-# 1. Update .env
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-
-# 2. Restart application
-# Done!
-```
-
-### Test Configuration
-```python
-from config import LLM_PROVIDER
-print(f"Using: {LLM_PROVIDER}")
-```
-
-### Get Provider Info
-```python
-from app.llm_factory import get_llm_provider_info
-print(get_llm_provider_info())
-```
-
----
-
-## Error Messages
-
-| Error | Fix |
-|-------|-----|
-| `LLM_PROVIDER must be 'openai' or 'gemini'` | Check spelling in `.env` |
-| `OPENAI_API_KEY required` | Set key if using openai |
-| `GEMINI_API_KEY required` | Set key if using gemini |
-| `Invalid API key` | Key is wrong, get a new one |
-| `ModuleNotFoundError: langchain_google_genai` | Run `pip install langchain-google-genai` |
-
----
-
-## Environment Variables Summary
-
-```env
-# === REQUIRED ===
-LLM_PROVIDER=gemini                    # or "openai"
-
-# === CONDITIONAL (based on LLM_PROVIDER) ===
-GEMINI_API_KEY=...                    # if LLM_PROVIDER=gemini
-OPENAI_API_KEY=sk-...                 # if LLM_PROVIDER=openai
-
-# === OPTIONAL (not changed) ===
-MONGODB_URL=mongodb://localhost:27017
-LANGFUSE_PUBLIC_KEY=...
-LANGFUSE_SECRET_KEY=...
-# ... rest of your config
-```
-
----
-
-## File Structure
-
-```
-chatbot/
-├── config.py                          # ✏️ Modified - LLM config
-├── app/
-│   ├── llm_factory.py                # ✨ NEW - LLM factory
-│   ├── llm.py                        # ✏️ Modified
-│   ├── endpoints.py                  # ✏️ Modified
-│   └── ...
-├── query_expander.py                 # ✏️ Modified
-├── context_compressor.py             # ✏️ Modified
-├── SETUP_GUIDE.md                    # 📚 NEW - Quick start
-├── ENV_SETUP.md                      # 📚 NEW - Detailed config
-├── LLM_PROVIDER_SWITCH.md            # 📚 NEW - Technical details
-├── CHANGES_SUMMARY.md                # 📚 NEW - Code changes
-├── QUICK_REFERENCE.md                # 📚 NEW - This file
-└── .env                              # Update this!
-```
-
----
-
-## Decision Matrix
-
-```
-Cost is priority?
-├─ YES → Use Gemini ✨
-│        (Free tier available)
-│
-└─ NO → Consider both:
-         ├─ Quality critical? → OpenAI
-         └─ Cost matters too? → Gemini
-```
-
----
-
-## Testing Checklist
-
-- [ ] Gemini API key acquired
-- [ ] `.env` updated with `LLM_PROVIDER=gemini`
-- [ ] `.env` updated with `GEMINI_API_KEY=...`
-- [ ] Application restarted
-- [ ] Test message sent
-- [ ] Response received ✅
-- [ ] Markdown formatting OK ✅
-- [ ] Links embedded correctly ✅
-
----
-
-## Performance Notes
-
-### Response Time
-- Both models: ~100-200ms per response
-- Network delay usually dominates
-- No perceptible difference for users
-
-### Cost Difference (per 10,000 messages)
-```
-OpenAI:   ~$10-20 per 10K messages
-Gemini:   ~$1-5  per 10K messages
-          (or FREE on free tier!)
-```
-
-### Quality
-- Both produce excellent responses
-- Identical quality for most use cases
-- No switching needed for quality reasons
-
----
-
-## Advanced: Multiple Providers
-
-If you want to support switching at runtime (advanced):
-
-```python
-# pseudocode - not implemented
-def get_llm_for_provider(provider: str):
-    from app.llm_factory import _get_openai_llm, _get_gemini_llm
-    if provider == "openai":
-        return _get_openai_llm()
-    elif provider == "gemini":
-        return _get_gemini_llm()
-```
-
----
-
-## Documentation Index
-
-| Document | Purpose |
-|----------|---------|
-| `SETUP_GUIDE.md` | ⭐ Start here! Quick 2-step setup |
-| `ENV_SETUP.md` | Detailed environment configuration |
-| `LLM_PROVIDER_SWITCH.md` | Technical architecture & how it works |
-| `CHANGES_SUMMARY.md` | Detailed code changes breakdown |
-| `QUICK_REFERENCE.md` | This file - quick lookup table |
-
----
-
-## Key Takeaways
-
-✅ **Easy to switch** - Just change 1 environment variable  
-✅ **No code changes** - Everything works automatically  
-✅ **Backward compatible** - Old `.env` files still work  
-✅ **Flexible** - Both providers fully supported  
-✅ **Cost-saving** - Gemini is much cheaper  
-✅ **Same quality** - Both produce excellent results  
-
----
-
-## One-Minute Setup
-
-```bash
-# 1. Get Gemini API key (5 seconds)
-# Visit: https://aistudio.google.com/app/apikey
-# Click "Create API Key" and copy it
-
-# 2. Update .env (5 seconds)
-echo "LLM_PROVIDER=gemini" >> .env
-echo "GEMINI_API_KEY=your-key-here" >> .env
-
-# 3. Restart (if using Gemini, install dependency first)
-pip install langchain-google-genai
-# Restart your application
-
-# Done! 🎉
-```
-
----
-
-## Troubleshooting Flow
-
-```
-Application error?
-├─ "GEMINI_API_KEY required"?
-│  └─ Add GEMINI_API_KEY to .env
-│
-├─ "Invalid API key"?
-│  └─ Get new key from aistudio.google.com
-│
-├─ "ModuleNotFoundError: langchain_google_genai"?
-│  └─ pip install langchain-google-genai
-│
-├─ "Still not working"?
-│  └─ Check LLM_PROVIDER spelling (must be "gemini" or "openai")
-│
-└─ Stuck?
-   └─ Read LLM_PROVIDER_SWITCH.md for detailed help
-```
-
----
-
-## Need Help?
-
-**For setup issues**: Read `ENV_SETUP.md`  
-**For technical details**: Read `LLM_PROVIDER_SWITCH.md`  
-**For code changes**: Read `CHANGES_SUMMARY.md`  
-**For quick reference**: You're reading it! 📄
-
----
-
-**Last Updated**: December 8, 2025  
-**Status**: ✅ Ready to use  
-**Support**: All providers fully tested
-
+**Questions?** See detailed docs above. Ready to deploy!

@@ -49,7 +49,8 @@ export default function TeamsAnalyticsPage() {
   const [selectedTeamDetails, setSelectedTeamDetails] = useState<TeamDetails | null>(null);
   const [showTeamDetails, setShowTeamDetails] = useState<boolean>(false);
 
-  const [timeFilter, setTimeFilter] = useState<string>('today');
+  const [selectedFilter, setSelectedFilter] = useState<string>('today'); // Filter selected by user
+  const [appliedFilter, setAppliedFilter] = useState<string>('today'); // Filter actually applied/fetched
   const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
 
   // Check admin access on mount
@@ -105,46 +106,74 @@ export default function TeamsAnalyticsPage() {
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-        const response = await fetch(url, {
-          method: 'GET',
-          headers,
-          credentials: 'include',
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-        console.log('[Teams Fetch] Response status:', response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[Teams Fetch] Error response:', errorText);
-          throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 200)}`);
-        }
-
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('[Teams Fetch] Invalid content type:', contentType);
-          throw new Error(`Invalid response type: ${contentType}`);
-        }
-
-        const data = await response.json();
-        console.log('[Teams Fetch] Success! Data:', data);
+        let timeoutId: NodeJS.Timeout | null = null;
         
-        if (!data.teams && !Array.isArray(data)) {
-          console.error('[Teams Fetch] Invalid response format:', data);
-          throw new Error('Invalid response format from server');
+        try {
+          // Increased timeout to 90 seconds for large datasets
+          timeoutId = setTimeout(() => {
+            console.warn('[Teams Fetch] Request timeout after 90 seconds, aborting...');
+            controller.abort();
+          }, 90000); // 90 second timeout
+
+          const response = await fetch(url, {
+            method: 'GET',
+            headers,
+            credentials: 'include',
+            signal: controller.signal,
+          });
+
+          // Clear timeout on successful response
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
+          console.log('[Teams Fetch] Response status:', response.status);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[Teams Fetch] Error response:', errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 200)}`);
+          }
+
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            console.error('[Teams Fetch] Invalid content type:', contentType);
+            throw new Error(`Invalid response type: ${contentType}`);
+          }
+
+          const data = await response.json();
+          console.log('[Teams Fetch] Success! Data:', data);
+          
+          if (!data.teams && !Array.isArray(data)) {
+            console.error('[Teams Fetch] Invalid response format:', data);
+            throw new Error('Invalid response format from server');
+          }
+          
+          setTeams(data.teams || data || []);
+          setLastFetchTime(Date.now());
+        } catch (fetchErr: any) {
+          // Clear timeout in case of error
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
+          // Handle AbortError specifically
+          if (fetchErr.name === 'AbortError' || fetchErr.message === 'signal is aborted without reason' || fetchErr.message?.includes('aborted')) {
+            console.error('[Teams Fetch] Request was aborted (timeout or cancelled)');
+            throw new Error('Request timed out. The data may be too large. Please try a different time filter or contact support.');
+          }
+          
+          if (fetchErr instanceof TypeError && fetchErr.message.includes('Failed to fetch')) {
+            console.error('[Teams Fetch] Network error (CORS or connection issue):', fetchErr);
+            throw new Error('Failed to connect to server. Check if backend is running and CORS is configured correctly.');
+          }
+          console.error('[Teams Fetch] Network error:', fetchErr);
+          throw fetchErr;
         }
-        
-        setTeams(data.teams || data || []);
-        setLastFetchTime(Date.now());
       } catch (fetchErr) {
-        if (fetchErr instanceof TypeError && fetchErr.message.includes('Failed to fetch')) {
-          console.error('[Teams Fetch] Network error (CORS or connection issue):', fetchErr);
-          throw new Error('Failed to connect to server. Check if backend is running and CORS is configured correctly.');
-        }
-        console.error('[Teams Fetch] Network error:', fetchErr);
+        // This catch is for the outer try-catch
         throw fetchErr;
       }
     } catch (err) {
@@ -172,7 +201,7 @@ export default function TeamsAnalyticsPage() {
       }
 
       const response = await fetch(
-        `${apiBase}/analytics/langfuse/teams/details/${encodeURIComponent(teamName)}?time_filter=${timeFilter}`,
+        `${apiBase}/analytics/langfuse/teams/details/${encodeURIComponent(teamName)}?time_filter=${appliedFilter}`,
         {
           method: 'GET',
           headers,
@@ -188,20 +217,20 @@ export default function TeamsAnalyticsPage() {
     } catch (err) {
       console.error('Team details fetch error:', err);
     }
-  }, [timeFilter]);
+  }, [appliedFilter]);
 
-  // Handle filter change
+  // Handle filter selection (doesn't fetch, just updates selection)
   const handleFilterChange = (filter: string) => {
-    setTimeFilter(filter);
-    fetchTeamsAnalytics(filter);
+    setSelectedFilter(filter);
   };
 
-  // Initial fetch on auth
-  useEffect(() => {
-    if (!loading && authUser) {
-      fetchTeamsAnalytics(timeFilter);
-    }
-  }, [loading, authUser, timeFilter]);
+  // Handle apply button click (fetches with selected filter)
+  const handleApplyFilter = () => {
+    setAppliedFilter(selectedFilter);
+    fetchTeamsAnalytics(selectedFilter);
+  };
+
+  // NO automatic fetching - only fetch when Apply button is clicked
 
   if (loading) {
     return (
@@ -220,26 +249,48 @@ export default function TeamsAnalyticsPage() {
       </div>
 
       {/* Filter Buttons */}
-      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-        {['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'all'].map((filter) => (
-          <button
-            key={filter}
-            onClick={() => handleFilterChange(filter)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: timeFilter === filter ? '2px solid #0129ac' : '1px solid #e5e7eb',
-              background: timeFilter === filter ? '#0129ac' : 'white',
-              color: timeFilter === filter ? 'white' : '#111827',
-              cursor: 'pointer',
-              fontWeight: timeFilter === filter ? '600' : '500',
-              fontSize: '14px',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {filter === 'this_week' ? 'This Week' : filter === 'last_week' ? 'Last Week' : filter === 'this_month' ? 'This Month' : filter.charAt(0).toUpperCase() + filter.slice(1)}
-          </button>
-        ))}
+      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'all'].map((filter) => {
+          const isSelected = selectedFilter === filter;
+          const isApplied = appliedFilter === filter;
+          return (
+            <button
+              key={filter}
+              onClick={() => handleFilterChange(filter)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: isSelected ? '2px solid #0129ac' : isApplied ? '2px solid #10b981' : '1px solid #e5e7eb',
+                background: isSelected ? '#0129ac' : isApplied ? '#f0fdf4' : 'white',
+                color: isSelected ? 'white' : isApplied ? '#059669' : '#111827',
+                cursor: 'pointer',
+                fontWeight: isSelected ? '600' : isApplied ? '600' : '500',
+                fontSize: '14px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {filter === 'this_week' ? 'This Week' : filter === 'last_week' ? 'Last Week' : filter === 'this_month' ? 'This Month' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+            </button>
+          );
+        })}
+        <button
+          onClick={handleApplyFilter}
+          disabled={fetching}
+          style={{
+            padding: '8px 20px',
+            borderRadius: '8px',
+            border: 'none',
+            background: fetching ? '#d1d5db' : '#0129ac',
+            color: 'white',
+            cursor: fetching ? 'not-allowed' : 'pointer',
+            fontWeight: '600',
+            fontSize: '14px',
+            transition: 'all 0.2s ease',
+            opacity: fetching ? 0.6 : 1,
+          }}
+        >
+          {fetching ? 'Loading...' : 'Apply'}
+        </button>
       </div>
 
       {/* Fetch Time */}

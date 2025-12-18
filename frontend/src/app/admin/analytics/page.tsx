@@ -96,7 +96,7 @@ export default function AdminLangfuseAnalyticsPage() {
         const fetchOptions = {
           headers,
           credentials: 'include' as const,
-          signal: AbortSignal.timeout(60000), // 60 second timeout
+          signal: AbortSignal.timeout(90000), // 90 second timeout
         };
 
         // Fetch summary
@@ -140,15 +140,12 @@ export default function AdminLangfuseAnalyticsPage() {
   // Handle filter change
   const handleFilterChange = (filter: string) => {
     setTimeFilter(filter as any);
-    fetchAnalytics(filter);
   };
 
-  // Initial fetch on auth
-  useEffect(() => {
-    if (!loading && authUser) {
-      fetchAnalytics(timeFilter);
-    }
-  }, [loading, authUser, timeFilter]);
+  // Handle apply button click
+  const handleApplyClick = () => {
+    fetchAnalytics(timeFilter);
+  };
 
   if (loading) {
     return (
@@ -167,7 +164,7 @@ export default function AdminLangfuseAnalyticsPage() {
       </div>
 
       {/* Filter Buttons */}
-      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         {['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'all'].map((filter) => (
           <button
             key={filter}
@@ -187,6 +184,26 @@ export default function AdminLangfuseAnalyticsPage() {
             {filter === 'this_week' ? 'This Week' : filter === 'last_week' ? 'Last Week' : filter === 'this_month' ? 'This Month' : filter.charAt(0).toUpperCase() + filter.slice(1)}
           </button>
         ))}
+        
+        {/* Apply Button */}
+        <button
+          onClick={handleApplyClick}
+          disabled={fetching}
+          style={{
+            padding: '8px 20px',
+            borderRadius: '8px',
+            border: 'none',
+            background: fetching ? '#d1d5db' : '#10b981',
+            color: 'white',
+            cursor: fetching ? 'not-allowed' : 'pointer',
+            fontWeight: '600',
+            fontSize: '14px',
+            transition: 'all 0.2s ease',
+            marginLeft: '12px',
+          }}
+        >
+          {fetching ? 'Fetching...' : 'Apply'}
+        </button>
       </div>
 
       {/* Fetch Time */}

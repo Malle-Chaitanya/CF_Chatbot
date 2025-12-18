@@ -8,9 +8,10 @@ from typing import List, Dict, Any
 # Define all teams with their leads and members
 TEAMS_STRUCTURE = {
     "Content": {
-        "lead": "Santosh Chintalapelli",
-        "lead_email": "santosh@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Santosh Chintalapelli", "email": "santosh@cloudfuze.com"},
             {"name": "Akhila Aenkoju", "email": "akhila.aenkoju@cloudfuze.com"},
             {"name": "Shaikh Adnan", "email": "adnan@cloudfuze.com"},
             {"name": "Mayank Jain", "email": "mayank@cloudfuze.com"},
@@ -36,9 +37,10 @@ TEAMS_STRUCTURE = {
         "description": "Content Team - M7"
     },
     "Messaging & Email": {
-        "lead": "Ankit Mishra",
-        "lead_email": "ankit@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Ankit Mishra", "email": "ankit@cloudfuze.com"},
             {"name": "Bhagya", "email": "bhagyashri.deokar@cloudfuze.com"},
             {"name": "Abhinandan Kumar", "email": "abhinandan.kumar@cloudfuze.com"},
             {"name": "Shivam Singh", "email": "shivam.singh@cloudfuze.com"},
@@ -53,9 +55,10 @@ TEAMS_STRUCTURE = {
         "description": "Messaging & Email"
     },
     "CF Manage": {
-        "lead": "Ravi Achakka Chandra",
-        "lead_email": "ravic@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Ravi Achakka Chandra", "email": "ravic@cloudfuze.com"},
             {"name": "Suraj Kumar", "email": "suraj.kumar@cloudfuze.com"},
             {"name": "Roopa Yerrabothu", "email": "roopa.yerrabothu@cloudfuze.com"},
             {"name": "Phani R", "email": "phani.ryali@cloudfuze.com"},
@@ -66,9 +69,10 @@ TEAMS_STRUCTURE = {
         "description": "CF Manage"
     },
     "QA": {
-        "lead": "Kamal Basha",
-        "lead_email": "kamal.basha@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Kamal Basha", "email": "kamal.basha@cloudfuze.com"},
             {"name": "Soumya G", "email": "soumya.gande@cloudfuze.com"},
             {"name": "Soniya P", "email": "soniya.paladugula@cloudfuze.com"},
             {"name": "Asma Karim", "email": "asma.karim@cloudfuze.com"},
@@ -82,25 +86,30 @@ TEAMS_STRUCTURE = {
         "description": "QA"
     },
     "Neutara Labs": {
-        "lead": "Ravi Poli",
-        "lead_email": "ravi.poli@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Ravi Poli", "email": "ravi.poli@cloudfuze.com"},
             {"name": "Bharath Tummaganti", "email": "bharath.tummaganti@cloudfuze.com"},
             {"name": "Satya Pinniti", "email": "satya.pinniti@cloudfuze.com"},
             {"name": "Bhanu Srikakulam", "email": "bhanu.srikakulam@cloudfuze.com"},
             {"name": "Sruthi Chimata", "email": "sruthi.chimata@cloudfuze.com"},
             {"name": "Jyoshitha Dhannapaneni", "email": "jyoshitha.dhannapaneni@cloudfuze.com"},
-            {"name": "Tharun P", "email": "tharun.pothi@cloudfuze.com"},
-            {"name": "Abhilasha K", "email": "abhilasha.kandakatla@cloudfuze.com"},
+            {"name": "Tharun P", "email": "Tharun.Pothi@cloudfuze.com"},
+            {"name": "Abhilasha K", "email": "Abhilasha.Kandakatla@cloudfuze.com"},
             {"name": "Anush Dasari", "email": "anush.dasari@cloudfuze.com"},
+            {"name": "Suditya Nimmala", "email": "suditya.nimmala@cloudfuze.com"},
+            {"name": "laxman kadari", "email": "laxman.kadari@cloudfuze.com"},
+            {"name": "chaitanya malle", "email": "chaitanya.malle@cloudfuze.com"},
         ],
         "color": "#8B5CF6",  # Purple
         "description": "Neutara Labs"
     },
     "Infra": {
-        "lead": "Pavan Bhagavathula",
-        "lead_email": "pavan@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Pavan Bhagavathula", "email": "pavan@cloudfuze.com"},
             {"name": "Gururaj Bhimrao", "email": "gururaj.bhimrao@cloudfuze.com"},
             {"name": "Nageshkumar Mhetre", "email": "nageshkumar.mhetre@cloudfuze.com"},
             {"name": "Hymavathi Irla", "email": "hymavathi@cloudfuze.com"},
@@ -111,9 +120,10 @@ TEAMS_STRUCTURE = {
         "description": "Infra"
     },
     "Marketing": {
-        "lead": "Arun Jyothi",
-        "lead_email": "jyothi@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Arun Jyothi", "email": "jyothi@cloudfuze.com"},
             {"name": "Hari Rowlo", "email": "hari.rowlo@cloudfuze.com"},
             {"name": "Srikanth Tammali", "email": "srikanth.tammali@cloudfuze.com"},
             {"name": "Venkata Rahul", "email": "venkata.rahul@cloudfuze.com"},
@@ -129,9 +139,10 @@ TEAMS_STRUCTURE = {
         "description": "Marketing"
     },
     "Pre-Sales": {
-        "lead": "Nivas",
-        "lead_email": "nivas@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Nivas", "email": "nivas@cloudfuze.com"},
             {"name": "Sonali Lunia", "email": "sonali.lunia@cloudfuze.com"},
             {"name": "Vimalesh T", "email": "vimalesh.t@cloudfuze.com"},
         ],
@@ -139,22 +150,23 @@ TEAMS_STRUCTURE = {
         "description": "Pre-Sales"
     },
     "M1": {
-        "lead": "Nikhil Patel",
-        "lead_email": "nikhil@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Nikhil Patel", "email": "nikhil@cloudfuze.com"},
             {"name": "Arshiya Syed", "email": "arshiya.syed@cloudfuze.com"},
             {"name": "Harsha Thakre", "email": "harsha.thakre@cloudfuze.com"},
             {"name": "Mallesh Pothina", "email": "mallesh.pothina@cloudfuze.com"},
-            {"name": "Chaitanya Malle", "email": "chaitanya.malle@cloudfuze.com"},
             {"name": "Harshith Kaduluri", "email": "harshith.kaduluri@cloudfuze.com"},
         ],
         "color": "#A78BFA",  # Light Purple
         "description": "M1"
     },
     "M2": {
-        "lead": "Maheswari Aram",
-        "lead_email": "maheswari.aram@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Maheswari Aram", "email": "maheswari.aram@cloudfuze.com"},
             {"name": "Tejaswini Sivakumaram", "email": "sivakumaram.tejaswini@cloudfuze.com"},
             {"name": "Ishwar Yadav", "email": "ishwar.yadav@cloudfuze.com"},
             {"name": "Siva Kota", "email": "siva.kota@cloudfuze.com"},
@@ -165,9 +177,10 @@ TEAMS_STRUCTURE = {
         "description": "M2"
     },
     "M3": {
-        "lead": "Lakshmi Prasanna",
-        "lead_email": "lakshmi.prasanna@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Lakshmi Prasanna", "email": "lakshmi.prasanna@cloudfuze.com"},
             {"name": "Meena Lakshmi Triveni", "email": "meena.lakshmi@cloudfuze.com"},
             {"name": "Swaroop", "email": "swaroop@cloudfuze.com"},
             {"name": "Lakshma Reddy", "email": "lakshma.reddy@cloudfuze.com"},
@@ -178,9 +191,10 @@ TEAMS_STRUCTURE = {
         "description": "M3"
     },
     "M4": {
-        "lead": "Neelima Krotta",
-        "lead_email": "neelima.krotta@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Neelima Krotta", "email": "neelima.krotta@cloudfuze.com"},
             {"name": "Nandini Tirumalasetti", "email": "nandini.tirumalasetti@cloudfuze.com"},
             {"name": "Manisha Verma", "email": "manisha.verma@cloudfuze.com"},
             {"name": "Sriram Ramakrishnan", "email": "sriram.ramakrishnan@cloudfuze.com"},
@@ -191,9 +205,10 @@ TEAMS_STRUCTURE = {
         "description": "M4"
     },
     "M4 (M+E)": {
-        "lead": "Ajay Singh",
-        "lead_email": "ajay.singh@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Ajay Singh", "email": "ajay.singh@cloudfuze.com"},
             {"name": "Aanchal Tyagi", "email": "aanchal.tyagi@cloudfuze.com"},
             {"name": "Akshay Raina", "email": "akshay.raina@cloudfuze.com"},
             {"name": "Dipali", "email": "dipali@cloudfuze.com"},
@@ -203,9 +218,10 @@ TEAMS_STRUCTURE = {
         "description": "M4 (Messaging + Email)"
     },
     "M6 (M+E)": {
-        "lead": "Abhishek Sakala",
-        "lead_email": "abhishek.sakala@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Abhishek Sakala", "email": "abhishek.sakala@cloudfuze.com"},
             {"name": "Pallavi K", "email": "pallavi.kosuvaripalli@cloudfuze.com"},
             {"name": "Arun Kandula", "email": "arun@cloudfuze.com"},
             {"name": "Manoj Bathula", "email": "manoj.bathula@cloudfuze.com"},
@@ -215,9 +231,10 @@ TEAMS_STRUCTURE = {
         "description": "M6 (Messaging + Email)"
     },
     "M5": {
-        "lead": "Abhishikth Yenugula",
-        "lead_email": "abhishikth.yenugula@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Abhishikth Yenugula", "email": "abhishikth.yenugula@cloudfuze.com"},
             {"name": "Ranadeep Muddam", "email": "ranadeep.muddam@cloudfuze.com"},
             {"name": "Amulya Anapuram", "email": "amulya.anapuram@cloudfuze.com"},
             {"name": "Vijendar Burgula", "email": "vijendar.burgula@cloudfuze.com"},
@@ -226,9 +243,10 @@ TEAMS_STRUCTURE = {
         "description": "M5"
     },
     "BD": {
-        "lead": "Karthik Brahmakal",
-        "lead_email": "karthik.brahmakal@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Karthik Brahmakal", "email": "karthik.brahmakal@cloudfuze.com"},
             {"name": "Pruthvi Raygol", "email": "pruthvi.raygol@cloudfuze.com"},
             {"name": "Vijay Kumar", "email": "vijay.kumar@cloudfuze.com"},
             {"name": "Craig Fernandez", "email": "craig.fernandez@cloudfuze.com"},
@@ -242,9 +260,10 @@ TEAMS_STRUCTURE = {
         "description": "Business Development"
     },
     "Sales Ops": {
-        "lead": "Rahul Gowda",
-        "lead_email": "rahul.gowda@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Rahul Gowda", "email": "rahul.gowda@cloudfuze.com"},
             {"name": "Sakshi Priya", "email": "sakshi.priya@cloudfuze.com"},
             {"name": "Raya Durai", "email": "raya.durai@cloudfuze.com"},
             {"name": "Varsha Nallashami", "email": "varsha.nallashami@cloudfuze.com"},
@@ -253,34 +272,37 @@ TEAMS_STRUCTURE = {
         "color": "#8B5CF6",  # Purple
         "description": "Sales Operations"
     },
-    "Sales – SMB": {
-        "lead": "Chitradip Saha",
-        "lead_email": "chitradip.saha@cloudfuze.com",
+    "Sales [SMB]": {
+        "lead": None,
+        "lead_email": None,
         "members": [
-            {"name": "Royston Aden", "email": "royston.aden@cloudfuze.com"},
-            {"name": "Deepak R J", "email": "deepak.rj@cloudfuze.com"},
+            {"name": "Chitradip Saha", "email": "chitradip.saha@cloudfuze.com"},
+            {"name": "Royston Aden", "email": "Royston.Aden@cloudfuze.com"},
+            {"name": "Deepak R J", "email": "Deepak.Rj@cloudfuze.com"},
             {"name": "Vicky Cariappa", "email": "vicky.cariappa@cloudfuze.com"},
-            {"name": "Yogesh T", "email": "yogesh.talurmath@cloudfuze.com"},
-            {"name": "Kartik Kashyap", "email": "kartik.kashyap@cloudfuze.com"},
-            {"name": "Kritika Gupta", "email": "kritika.gupta@cloudfuze.com"},
+            {"name": "Yogesh Vig", "email": "Yogesh.vig@cloudfuze.com"},
+            {"name": "Kartik Kashyap", "email": "Kartik.Kashyap@cloudfuze.com"},
+            {"name": "Kritika Gupta", "email": "Kritika.Gupta@cloudfuze.com"},
         ],
         "color": "#F59E0B",  # Amber
-        "description": "Sales – SMB"
+        "description": "Sales [SMB]"
     },
-    "Sales – ENT": {
-        "lead": "Anthony Raymond",
-        "lead_email": "anthony@cloudfuze.com",
+    "Sales [ENT]": {
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Anthony Raymond", "email": "anthony@cloudfuze.com"},
             {"name": "Lukas Bohlander", "email": "lukas.bohlander@cloudfuze.com"},
             {"name": "Charles Stiltner", "email": "charles.stiltner@cloudfuze.com"},
         ],
         "color": "#EF4444",  # Red
-        "description": "Sales – Enterprise"
+        "description": "Sales [Enterprise]"
     },
-    "Sales – AM": {
-        "lead": "Lawrence Lewis",
-        "lead_email": "lawrence.lewis@cloudfuze.com",
+    "Sales [AM]": {
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Lawrence Lewis", "email": "lawrence.lewis@cloudfuze.com"},
             {"name": "Nikitha Shekher", "email": "nikita.shekher@cloudfuze.com"},
             {"name": "Joy Prakash", "email": "joy.prakash@cloudfuze.com"},
             {"name": "Jalsha Chakma", "email": "jalsha.chakma@cloudfuze.com"},
@@ -289,12 +311,13 @@ TEAMS_STRUCTURE = {
             {"name": "Garima Patel", "email": "garima.patel@cloudfuze.com"},
         ],
         "color": "#10B981",  # Green
-        "description": "Sales – Account Management"
+        "description": "Sales [Account Management]"
     },
     "HR": {
-        "lead": "Gopi Krishna",
-        "lead_email": "gopi@cloudfuze.com",
+        "lead": None,
+        "lead_email": None,
         "members": [
+            {"name": "Gopi Krishna", "email": "gopi@cloudfuze.com"},
             {"name": "Vipra Mishra", "email": "vipra.mishra@cloudfuze.com"},
             {"name": "Sujana Manapuram", "email": "sujana.manapuram@cloudfuze.com"},
             {"name": "Madhuri Yeleswarapu", "email": "madhuri.yeleswarapu@cloudfuze.com"},
@@ -302,6 +325,15 @@ TEAMS_STRUCTURE = {
         ],
         "color": "#3B82F6",  # Blue
         "description": "Human Resources"
+    },
+    "Manager": {
+        "lead": None,
+        "lead_email": None,
+        "members": [
+            {"name": "Raghavan Krishnan", "email": "raghavan.krishnan@cloudfuze.com"},
+        ],
+        "color": "#64748B",  # Slate Gray
+        "description": "Manager"
     },
 }
 
@@ -317,21 +349,30 @@ def get_team_by_name(team_name: str) -> dict:
 
 
 def get_team_by_member_email(email: str) -> str:
-    """Find which team a member belongs to by email."""
+    """Find which team a member belongs to by email.
+    
+    This function handles:
+    - Direct email matches (exact email in team)
+    - Case-insensitive matching
+    - Whitespace normalization
+    - Returns "Unassigned" if not found
+    """
     if not email:
         return "Unassigned"
     
     email_lower = str(email).lower().strip()
     
+    # First pass: Direct email match (most efficient)
     for team_name, team_info in TEAMS_STRUCTURE.items():
         # Check if it's the lead
         lead_email = team_info.get("lead_email")
-        if lead_email and str(lead_email).lower() == email_lower:
+        if lead_email and str(lead_email).lower().strip() == email_lower:
             return team_name
         
         # Check if it's a member
         for member in team_info.get("members", []):
-            if member.get("email", "").lower() == email_lower:
+            member_email = member.get("email", "").lower().strip()
+            if member_email == email_lower:
                 return team_name
     
     return "Unassigned"
@@ -381,6 +422,33 @@ def normalize_email(email: str) -> str:
     return email.lower().strip()
 
 
+# Email exclusion list for analytics - MANAGED VIA FRONTEND TOGGLE
+# This is now handled by frontend admin controls, not hardcoded here
+ANALYTICS_EXCLUSION_LIST = set()  # Empty by default - all emails included
+
+
+def is_email_excluded(email: str, exclusion_list: set = None) -> bool:
+    """
+    Check if email should be excluded from analytics.
+    Now accepts dynamic exclusion list from frontend.
+    
+    Args:
+        email: Email to check
+        exclusion_list: Optional set of emails to exclude (from frontend)
+    
+    Returns:
+        True if email should be excluded, False otherwise
+    """
+    if not email or not exclusion_list:
+        return False
+    return email.lower().strip() in exclusion_list
+
+
+def get_exclusion_list() -> set:
+    """Get the list of excluded emails."""
+    return ANALYTICS_EXCLUSION_LIST.copy()
+
+
 def get_team_by_member_name(member_name: str) -> str:
     """Find which team a member belongs to by name."""
     if not member_name:
@@ -413,3 +481,106 @@ for team_name, team_info in TEAMS_STRUCTURE.items():
 def get_team_for_member(member_name: str) -> str:
     """Legacy function - find team for member by name."""
     return get_team_by_member_name(member_name)
+
+
+def get_all_email_to_team_mapping() -> Dict[str, str]:
+    """Get a flat mapping of all emails to their teams.
+    
+    This creates a dictionary for fast O(1) lookups instead of O(n) iteration.
+    Useful for batch processing and analytics.
+    
+    Returns:
+    {
+        "email@domain.com": "Team Name",
+        ...
+    }
+    """
+    mapping = {}
+    
+    for team_name, team_info in TEAMS_STRUCTURE.items():
+        # Add lead
+        if team_info.get("lead_email"):
+            email_lower = team_info["lead_email"].lower().strip()
+            if email_lower:
+                mapping[email_lower] = team_name
+        
+        # Add members
+        for member in team_info.get("members", []):
+            email = member.get("email", "").lower().strip()
+            if email:
+                mapping[email] = team_name
+    
+    return mapping
+
+
+def validate_team_emails() -> Dict[str, Any]:
+    """Validate team email structure and return diagnostic information.
+    
+    This function checks:
+    - Empty emails
+    - Duplicate emails across teams
+    - Invalid email format
+    - Missing team members
+    
+    Returns diagnostic data for debugging.
+    """
+    diagnostics = {
+        "total_teams": len(TEAMS_STRUCTURE),
+        "total_members": 0,
+        "total_leads": 0,
+        "empty_emails": [],
+        "duplicate_emails": {},
+        "invalid_emails": [],
+        "teams_with_no_members": [],
+        "email_count": 0
+    }
+    
+    email_to_teams = {}  # Track which teams have each email
+    
+    for team_name, team_info in TEAMS_STRUCTURE.items():
+        # Check lead
+        if team_info.get("lead_email"):
+            lead_email = team_info.get("lead_email", "").lower().strip()
+            diagnostics["total_leads"] += 1
+            
+            if not lead_email:
+                diagnostics["empty_emails"].append({
+                    "team": team_name,
+                    "type": "lead",
+                    "value": team_info.get("lead_email")
+                })
+            else:
+                diagnostics["email_count"] += 1
+                if lead_email not in email_to_teams:
+                    email_to_teams[lead_email] = []
+                email_to_teams[lead_email].append(team_name)
+        
+        # Check members
+        members = team_info.get("members", [])
+        diagnostics["total_members"] += len(members)
+        
+        if not members:
+            diagnostics["teams_with_no_members"].append(team_name)
+        
+        for member in members:
+            member_email = member.get("email", "").lower().strip()
+            
+            if not member_email:
+                diagnostics["empty_emails"].append({
+                    "team": team_name,
+                    "type": "member",
+                    "name": member.get("name"),
+                    "value": member.get("email")
+                })
+            else:
+                diagnostics["email_count"] += 1
+                if member_email not in email_to_teams:
+                    email_to_teams[member_email] = []
+                email_to_teams[member_email].append(team_name)
+    
+    # Find duplicates (same email in multiple teams)
+    for email, teams in email_to_teams.items():
+        if len(teams) > 1:
+            diagnostics["duplicate_emails"][email] = teams
+    
+    return diagnostics
