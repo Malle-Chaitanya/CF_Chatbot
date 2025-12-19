@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Image from 'next/image';
+import Snowfall from 'react-snowfall';
 
 export default function LoginPage() {
   useEffect(() => {
@@ -10,6 +11,10 @@ export default function LoginPage() {
 
   return (
     <>
+      <Snowfall
+  snowflakeCount={150}
+  color="#CAE7FF"
+/>
       <header>
         <Image src="/images/CloudFuze Horizontal Logo.svg" alt="CloudFuze Logo" width={150} height={40} priority />
       </header>
@@ -507,4 +512,3 @@ function initializeLoginPage() {
     checkAuthStatus();
   });
 }
-

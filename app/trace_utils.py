@@ -14,6 +14,9 @@ from datetime import datetime, timezone
 from typing import Dict, List, Tuple, Optional, Any
 from collections import Counter
 import logging
+import json
+import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -347,4 +350,70 @@ def calculate_question_metrics(questions_list: List[str]) -> Dict[str, Any]:
         "unique_count": unique_count,
         "top_questions": top_questions
     }
+
+
+def save_traces_to_json(
+    traces: List[Dict[str, Any]],
+    time_filter: str = "unknown",
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    endpoint_name: str = "unknown"
+) -> str:
+    """
+    Save traces to a JSON file with timestamp in filename.
+    Files are saved in a dedicated 'langfuse_traces_backup' folder.
+    
+    Args:
+        traces: List of trace dictionaries to save
+        time_filter: The time filter used (today, yesterday, etc.)
+        start_time: Optional start time of the query
+        end_time: Optional end time of the query
+        endpoint_name: Name of the endpoint that fetched these traces
+    
+    Returns:
+        Path to the saved JSON file, or empty string if error
+    """
+    try:
+        # Create dedicated traces backup directory if it doesn't exist
+        traces_dir = Path("langfuse_traces_backup")
+        traces_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename with timestamp
+        now = datetime.now(timezone.utc)
+        timestamp_str = now.strftime("%Y%m%d_%H%M%S")
+        filename = f"traces_{time_filter}_{timestamp_str}.json"
+        filepath = traces_dir / filename
+        
+        # Prepare metadata
+        metadata = {
+            "fetch_timestamp": now.isoformat(),
+            "time_filter": time_filter,
+            "endpoint_name": endpoint_name,
+            "total_traces": len(traces),
+            "date_range": {
+                "start_time": start_time.isoformat() if start_time else None,
+                "end_time": end_time.isoformat() if end_time else None
+            }
+        }
+        
+        # Prepare data structure
+        data = {
+            "metadata": metadata,
+            "traces": traces
+        }
+        
+        # Save to JSON file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+        
+        print(f"[TRACE_SAVE] Saved {len(traces)} traces to {filepath}")
+        logger.info(f"Saved {len(traces)} traces to {filepath}")
+        
+        return str(filepath)
+    
+    except Exception as e:
+        error_msg = f"Error saving traces to JSON: {e}"
+        print(f"[ERROR] {error_msg}")
+        logger.error(error_msg, exc_info=True)
+        return ""
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from fastapi import APIRouter, Request, HTTPException, Header, Depends, Query
+from fastapi import APIRouter, Request, HTTPException, Header, Depends, Query, Path
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
@@ -3143,7 +3143,7 @@ async def get_teams_analytics_summary_clean(
             get_all_email_to_team_mapping, validate_team_emails,
             get_exclusion_list
         )
-        from app.trace_utils import TraceFilteringStats, process_trace_batch, calculate_question_metrics
+        from app.trace_utils import TraceFilteringStats, process_trace_batch, calculate_question_metrics, save_traces_to_json
         import asyncio
         from datetime import datetime, timedelta, timezone
         import httpx
@@ -3213,6 +3213,7 @@ async def get_teams_analytics_summary_clean(
         batch_limit = 100
         max_pages =20 if time_filter in ["today", "yesterday"] else (10 if time_filter != "all" else 20)
         rate_limit_backoff = 1.0
+        all_traces = []  # Collect all traces for saving
         
         async with httpx.AsyncClient() as client:
             while page <= max_pages:
@@ -3260,6 +3261,9 @@ async def get_teams_analytics_summary_clean(
                         print(f"[INFO] No traces returned at page {page}, stopping pagination")
                         break
                     
+                    # Collect all traces for saving (before filtering)
+                    all_traces.extend(traces)
+                    
                     # Filter out excluded emails BEFORE processing
                     filtered_traces = []
                     page_excluded = 0
@@ -3303,6 +3307,16 @@ async def get_teams_analytics_summary_clean(
                     import traceback
                     traceback.print_exc()
                     break
+        
+        # Save all fetched traces to JSON file
+        if all_traces:
+            save_traces_to_json(
+                traces=all_traces,
+                time_filter=time_filter,
+                start_time=start_time,
+                end_time=end_time,
+                endpoint_name="teams_summary_clean"
+            )
         
         # Calculate metrics
         team_stats = []
@@ -3386,7 +3400,7 @@ async def get_teams_analytics_summary(
         from app.langfuse_integration import langfuse_client
         from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
         from app.models.teams import get_all_teams, get_team_by_member_email, get_team_color, get_all_email_to_team_mapping, validate_team_emails
-        from app.trace_utils import TraceFilteringStats, process_trace_batch, calculate_question_metrics
+        from app.trace_utils import TraceFilteringStats, process_trace_batch, calculate_question_metrics, save_traces_to_json
         import asyncio
         from datetime import datetime, timedelta, timezone
         import httpx
@@ -3476,8 +3490,9 @@ async def get_teams_analytics_summary(
         # - Today/Yesterday: 5 pages = ~500 traces (was 3 pages = 300)
         # - This week/Last week: 10 pages = ~1000 traces (was 5 pages = 500)
         # - All time: 20 pages = ~2000 traces (was 10 pages = 1000)
-        max_pages = 20 if time_filter in ["today", "yesterday"] else (20 if time_filter != "all" else 20)
+        max_pages = 5 if time_filter in ["today", "yesterday"] else (10 if time_filter != "all" else 20)
         rate_limit_backoff = 1.0  # Initial backoff for rate limiting
+        all_traces = []  # Collect all traces for saving
         
         print(f"[PAGINATION] max_pages={max_pages}, batch_limit={batch_limit}")
         
@@ -3529,6 +3544,9 @@ async def get_teams_analytics_summary(
                         print(f"[INFO] No traces returned at page {page}, stopping pagination")
                         break
                     
+                    # Collect all traces for saving
+                    all_traces.extend(traces)
+                    
                     # Process traces using unified utility function
                     traces_added = process_trace_batch(
                         traces,
@@ -3557,6 +3575,16 @@ async def get_teams_analytics_summary(
                     import traceback
                     traceback.print_exc()
                     break
+        
+        # Save all fetched traces to JSON file
+        if all_traces:
+            save_traces_to_json(
+                traces=all_traces,
+                time_filter=time_filter,
+                start_time=start_time,
+                end_time=end_time,
+                endpoint_name="teams_summary"
+            )
         
         print(f"\n[STEP 7] Processing team statistics...")
         # Calculate unique questions and top questions per team
@@ -3704,7 +3732,7 @@ async def get_teams_analytics_with_exclusion(
             get_all_teams, get_team_by_member_email, get_team_color,
             get_all_email_to_team_mapping, validate_team_emails
         )
-        from app.trace_utils import TraceFilteringStats, process_trace_batch, calculate_question_metrics
+        from app.trace_utils import TraceFilteringStats, process_trace_batch, calculate_question_metrics, save_traces_to_json
         import asyncio
         from datetime import datetime, timedelta, timezone
         import httpx
@@ -3772,8 +3800,9 @@ async def get_teams_analytics_with_exclusion(
         print("[INFO] Fetching traces from Langfuse...")
         page = 1
         batch_limit = 100
-        max_pages = 20 if time_filter in ["today", "yesterday"] else (20 if time_filter != "all" else 20)
+        max_pages = 5 if time_filter in ["today", "yesterday"] else (10 if time_filter != "all" else 20)
         excluded_count = 0
+        all_traces = []  # Collect all traces for saving
         
         async with httpx.AsyncClient() as client:
             while page <= max_pages:
@@ -3803,6 +3832,9 @@ async def get_teams_analytics_with_exclusion(
                     
                     if not traces:
                         break
+                    
+                    # Collect all traces for saving
+                    all_traces.extend(traces)
                     
                     # Filter out excluded emails
                     filtered_traces = []
@@ -3837,6 +3869,16 @@ async def get_teams_analytics_with_exclusion(
                 except Exception as e:
                     print(f"[ERROR] Error fetching traces: {e}")
                     break
+        
+        # Save all fetched traces to JSON file
+        if all_traces:
+            save_traces_to_json(
+                traces=all_traces,
+                time_filter=time_filter,
+                start_time=start_time,
+                end_time=end_time,
+                endpoint_name="teams_summary_with_exclusion"
+            )
         
         # Calculate metrics
         team_stats = []
@@ -4121,6 +4163,9 @@ async def get_team_details(
                     if not traces:
                         break
                     
+                    # Collect all traces for saving
+                    all_traces.extend(traces)
+                    
                     # Process traces
                     for trace in traces:
                         metadata = trace.get("metadata", {})
@@ -4210,6 +4255,7 @@ async def get_langfuse_dashboard_summary(
     """
     try:
         from app.langfuse_integration import langfuse_client
+        from app.trace_utils import save_traces_to_json
         import asyncio
         from datetime import datetime, timedelta, timezone
         
@@ -4248,11 +4294,12 @@ async def get_langfuse_dashboard_summary(
         
         users_activity = defaultdict(lambda: {"count": 0, "email": "", "name": ""})
         all_questions = []
+        all_traces = []  # Collect all traces for saving
         
         page = 1
         batch_limit = 100
         # Match teams endpoint page limits for consistency (INCREASED for more comprehensive data)
-        max_pages = 20 if time_filter in ["today", "yesterday"] else (20 if time_filter != "all" else 20)
+        max_pages = 5 if time_filter in ["today", "yesterday"] else (10 if time_filter != "all" else 20)
         
         async with httpx.AsyncClient() as client:
             from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
@@ -4322,6 +4369,16 @@ async def get_langfuse_dashboard_summary(
                 except Exception as e:
                     print(f"[ERROR] Langfuse API error: {e}")
                     break
+        
+        # Save all fetched traces to JSON file
+        if all_traces:
+            save_traces_to_json(
+                traces=all_traces,
+                time_filter=time_filter,
+                start_time=start_time,
+                end_time=end_time,
+                endpoint_name="dashboard_summary"
+            )
         
         # Get most active users (top 10)
         most_active = sorted(
@@ -4393,6 +4450,7 @@ async def get_langfuse_users_analytics(
     try:
         from app.langfuse_integration import langfuse_client
         from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
+        from app.trace_utils import save_traces_to_json
         import asyncio
         from datetime import datetime, timedelta, timezone
         
@@ -4432,7 +4490,8 @@ async def get_langfuse_users_analytics(
         page = 1
         limit = 100
         # Match teams endpoint page limits for consistency (INCREASED for more comprehensive data)
-        max_pages = 20 if time_filter in ["today", "yesterday"] else (20 if time_filter != "all" else 20)
+        max_pages = 5 if time_filter in ["today", "yesterday"] else (10 if time_filter != "all" else 20)
+        all_traces = []  # Collect all traces for saving
         
         async with httpx.AsyncClient() as client:
             while page <= max_pages:
@@ -4525,6 +4584,16 @@ async def get_langfuse_users_analytics(
                 except Exception as e:
                     print(f"[ERROR] Error fetching traces: {e}")
                     break
+        
+        # Save all fetched traces to JSON file
+        if all_traces:
+            save_traces_to_json(
+                traces=all_traces,
+                time_filter=time_filter,
+                start_time=start_time,
+                end_time=end_time,
+                endpoint_name="users_analytics"
+            )
         
         # Process data - find top questions
         for user_id, user_info in users_data.items():
@@ -4802,10 +4871,11 @@ async def get_top_questions_global(
             end_time = None
         
         all_questions = []
+        all_traces = []  # Collect all traces for saving
         page = 1
         batch_limit = 100
         # Match teams endpoint page limits for consistency (INCREASED for more comprehensive data)
-        max_pages = 20 if time_filter in ["today", "yesterday"] else (20 if time_filter != "all" else 20)
+        max_pages = 5 if time_filter in ["today", "yesterday"] else (10 if time_filter != "all" else 20)
         
         async with httpx.AsyncClient() as client:
             while page <= max_pages:
@@ -4841,6 +4911,9 @@ async def get_top_questions_global(
                     if not traces:
                         break
                     
+                    # Collect all traces for saving
+                    all_traces.extend(traces)
+                    
                     for trace in traces:
                         question = trace.get("input", "")
                         if question:
@@ -4854,6 +4927,16 @@ async def get_top_questions_global(
                 except Exception as e:
                     print(f"[ERROR] Error fetching traces: {e}")
                     break
+        
+        # Save all fetched traces to JSON file
+        if all_traces:
+            save_traces_to_json(
+                traces=all_traces,
+                time_filter=time_filter,
+                start_time=start_time,
+                end_time=end_time,
+                endpoint_name="top_questions"
+            )
         
         # Get top questions
         try:
@@ -5399,17 +5482,15 @@ async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
         return {"error": f"OAuth callback failed: {str(e)}"}
 
 
-@router.get("/analytics/langfuse/teams/details")
-async def get_langfuse_team_details(
-    team_name: str = Query(..., description="Team name"),
-    start_date: str = Query(None, description="Start date in YYYY-MM-DD format"),
-    end_date: str = Query(None, description="End date in YYYY-MM-DD format"),
-    time_filter: str = Query(None, description="(Legacy) Filter by time: today, yesterday, this_week, last_week, all"),
-    current_user: dict = Depends(require_restricted_admin)
+async def _get_langfuse_team_details_internal(
+    team_name: str,
+    start_date: str = None,
+    end_date: str = None,
+    time_filter: str = None
 ):
     """
-    Get detailed analytics for a specific team including all members and their stats.
-    Supports both date range (start_date/end_date) and preset filters (time_filter).
+    Internal function to get detailed analytics for a specific team.
+    This is shared by both path parameter and query parameter endpoints.
     """
     try:
         from app.langfuse_integration import langfuse_client
@@ -5642,6 +5723,46 @@ async def get_langfuse_team_details(
             "status": "error",
             "error": str(e)
         }
+
+
+@router.get("/analytics/langfuse/teams/details/{team_name}")
+async def get_langfuse_team_details(
+    team_name: str = Path(..., description="Team name"),
+    start_date: str = Query(None, description="Start date in YYYY-MM-DD format"),
+    end_date: str = Query(None, description="End date in YYYY-MM-DD format"),
+    time_filter: str = Query(None, description="(Legacy) Filter by time: today, yesterday, this_week, last_week, all"),
+    current_user: dict = Depends(require_restricted_admin)
+):
+    """
+    Get detailed analytics for a specific team including all members and their stats.
+    Supports both date range (start_date/end_date) and preset filters (time_filter).
+    """
+    return await _get_langfuse_team_details_internal(
+        team_name=team_name,
+        start_date=start_date,
+        end_date=end_date,
+        time_filter=time_filter
+    )
+
+
+@router.get("/analytics/langfuse/teams/details")
+async def get_langfuse_team_details_legacy(
+    team_name: str = Query(..., description="Team name"),
+    start_date: str = Query(None, description="Start date in YYYY-MM-DD format"),
+    end_date: str = Query(None, description="End date in YYYY-MM-DD format"),
+    time_filter: str = Query(None, description="(Legacy) Filter by time: today, yesterday, this_week, last_week, all"),
+    current_user: dict = Depends(require_restricted_admin)
+):
+    """
+    Legacy endpoint for team details using query parameters.
+    Maintains backward compatibility with existing tests and API calls.
+    """
+    return await _get_langfuse_team_details_internal(
+        team_name=team_name,
+        start_date=start_date,
+        end_date=end_date,
+        time_filter=time_filter
+    )
 
 
 def get_team_color(team_name: str) -> str:

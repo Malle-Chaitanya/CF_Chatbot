@@ -12,15 +12,15 @@ TEAMS_STRUCTURE = {
         "lead_email": None,
         "members": [
             {"name": "Santosh Chintalapelli", "email": "santosh@cloudfuze.com"},
-            {"name": "Akhila Aenkoju", "email": "akhila.aenkoju@cloudfuze.com"},
+            {"name": "Akhila Aenkoju", "email": "Akhila.Aenkoju@cloudfuze.com"},
             {"name": "Shaikh Adnan", "email": "adnan@cloudfuze.com"},
             {"name": "Mayank Jain", "email": "mayank@cloudfuze.com"},
-            {"name": "Amuda Shivakumar", "email": "shiva.amuda@cloudfuze.com"},
-            {"name": "Praveen Vancharla", "email": "praveen.v@cloudfuze.com"},
-            {"name": "Naved", "email": "naved.osama@cloudfuze.com"},
-            {"name": "Srinu G", "email": "srinu.gudimitla@cloudfuze.com"},
+            {"name": "Amuda Shivakumar", "email": "Shiva.Amuda@cloudfuze.com"},
+            {"name": "Praveen Vancharla", "email": "Praveen.V@cloudfuze.com"},
+            {"name": "Naved", "email": "Naved.Osama@cloudfuze.com"},
+            {"name": "Srinu G", "email": "Srinu.Gudimitla@cloudfuze.com"},
             {"name": "Ravi Srivastava", "email": "ravi.srivastava@cloudfuze.com"},
-            {"name": "Vishal Kumar", "email": "vishal.kumar@cloudfuze.com"},
+            {"name": "Vishal Kumar", "email": "Vishal.Kumar@cloudfuze.com"},
             {"name": "Jaswanth Adari", "email": "jaswanth.adari@cloudfuze.com"},
         ],
         "color": "#3B82F6",  # Blue
@@ -45,11 +45,11 @@ TEAMS_STRUCTURE = {
             {"name": "Abhinandan Kumar", "email": "abhinandan.kumar@cloudfuze.com"},
             {"name": "Shivam Singh", "email": "shivam.singh@cloudfuze.com"},
             {"name": "Pragati Pandey", "email": "pragati.pandey@cloudfuze.com"},
-            {"name": "Sai Raj", "email": "sairaj.kanigicharla@cloudfuze.com"},
-            {"name": "Anantha Lakshmi", "email": "lakshmi.adabala@cloudfuze.com"},
-            {"name": "Vamsi Malla", "email": "vamsi.malla@cloudfuze.com"},
-            {"name": "Hemadasu Kantam", "email": "hemadasu.kantam@cloudfuze.com"},
-            {"name": "Akib Mohd", "email": "akib.mohd@cloudfuze.com"},
+            {"name": "Sai Raj", "email": "SaiRaj.Kanigicharla@cloudfuze.com"},
+            {"name": "Anantha Lakshmi", "email": "Lakshmi.Adabala@cloudfuze.com"},
+            {"name": "Vamsi Malla", "email": "Vamsi.Malla@cloudfuze.com"},
+            {"name": "Hemadasu Kantam", "email": "Hemadasu.Kantam@cloudfuze.com"},
+            {"name": "Akib Mohd", "email": "Akib.Mohd@cloudfuze.com"},
         ],
         "color": "#10B981",  # Green
         "description": "Messaging & Email"
@@ -61,8 +61,8 @@ TEAMS_STRUCTURE = {
             {"name": "Ravi Achakka Chandra", "email": "ravic@cloudfuze.com"},
             {"name": "Suraj Kumar", "email": "suraj.kumar@cloudfuze.com"},
             {"name": "Roopa Yerrabothu", "email": "roopa.yerrabothu@cloudfuze.com"},
-            {"name": "Phani R", "email": "phani.ryali@cloudfuze.com"},
-            {"name": "Prakash S", "email": "prakash.singampalli@cloudfuze.com"},
+            {"name": "Phani R", "email": "Phani.Ryali@cloudfuze.com"},
+            {"name": "Prakash S", "email": "Prakash.Singampalli@cloudfuze.com"},
             {"name": "Giridhar Kolavasi", "email": "giridhar.kolavasi@cloudfuze.com"},
         ],
         "color": "#F59E0B",  # Amber
@@ -72,11 +72,11 @@ TEAMS_STRUCTURE = {
         "lead": None,
         "lead_email": None,
         "members": [
-            {"name": "Kamal Basha", "email": "kamal.basha@cloudfuze.com"},
+            {"name": "Kamal Basha", "email": "Kamal.Basha@cloudfuze.com"},
             {"name": "Soumya G", "email": "soumya.gande@cloudfuze.com"},
             {"name": "Soniya P", "email": "soniya.paladugula@cloudfuze.com"},
-            {"name": "Asma Karim", "email": "asma.karim@cloudfuze.com"},
-            {"name": "Kiran Ummenthala", "email": "kiran.ummenthala@cloudfuze.com"},
+            {"name": "Asma Karim", "email": "Asma.Karim@cloudfuze.com"},
+            {"name": "Kiran Ummenthala", "email": "Kiran.Ummenthala@cloudfuze.com"},
             {"name": "Bhuvana Mosra", "email": "bhuvana.mosra@cloudfuze.com"},
             {"name": "Ganesh Guda", "email": "ganesh.guda@cloudfuze.com"},
             {"name": "Sadia Shaik", "email": "sadia.shaik@cloudfuze.com"},
@@ -90,17 +90,17 @@ TEAMS_STRUCTURE = {
         "lead_email": None,
         "members": [
             {"name": "Ravi Poli", "email": "ravi.poli@cloudfuze.com"},
-            {"name": "Bharath Tummaganti", "email": "bharath.tummaganti@cloudfuze.com"},
-            {"name": "Satya Pinniti", "email": "satya.pinniti@cloudfuze.com"},
+            {"name": "Bharath Tummaganti", "email": "Bharath.Tummaganti@cloudfuze.com"},
+            {"name": "Satya Pinniti", "email": "Satya.Pinniti@cloudfuze.com"},
             {"name": "Bhanu Srikakulam", "email": "bhanu.srikakulam@cloudfuze.com"},
             {"name": "Sruthi Chimata", "email": "sruthi.chimata@cloudfuze.com"},
-            {"name": "Jyoshitha Dhannapaneni", "email": "jyoshitha.dhannapaneni@cloudfuze.com"},
+            {"name": "Jyoshitha Dhannapaneni", "email": "Jyoshitha.Dhannapaneni@cloudfuze.com"},
             {"name": "Tharun P", "email": "Tharun.Pothi@cloudfuze.com"},
             {"name": "Abhilasha K", "email": "Abhilasha.Kandakatla@cloudfuze.com"},
-            {"name": "Anush Dasari", "email": "anush.dasari@cloudfuze.com"},
-            {"name": "Suditya Nimmala", "email": "suditya.nimmala@cloudfuze.com"},
-            {"name": "laxman kadari", "email": "laxman.kadari@cloudfuze.com"},
-            {"name": "chaitanya malle", "email": "chaitanya.malle@cloudfuze.com"},
+            {"name": "Anush Dasari", "email": "Anush.Dasari@cloudfuze.com"},
+            {"name": "Suditya Nimmala", "email": "Suditya.Nimmala@cloudfuze.com"},
+            {"name": "Laxman Kadari", "email": "Laxman.Kadari@cloudfuze.com"},
+            {"name": "Chaitanya Malle", "email": "chaitanya.malle@cloudfuze.com"},
         ],
         "color": "#8B5CF6",  # Purple
         "description": "Neutara Labs"
@@ -112,7 +112,7 @@ TEAMS_STRUCTURE = {
             {"name": "Pavan Bhagavathula", "email": "pavan@cloudfuze.com"},
             {"name": "Gururaj Bhimrao", "email": "gururaj.bhimrao@cloudfuze.com"},
             {"name": "Nageshkumar Mhetre", "email": "nageshkumar.mhetre@cloudfuze.com"},
-            {"name": "Hymavathi Irla", "email": "hymavathi@cloudfuze.com"},
+            {"name": "Hymavathi Irla", "email": "Hymavathi@cloudfuze.com"},
             {"name": "Bala Raviteja", "email": "bala.raviteja@cloudfuze.com"},
             {"name": "Sravani Avagadda", "email": "avagadda.sravani@cloudfuze.com"},
         ],
@@ -130,9 +130,9 @@ TEAMS_STRUCTURE = {
             {"name": "Nirosh Reddy", "email": "nirosh.reddy@cloudfuze.com"},
             {"name": "Ashu Tiwary", "email": "ashu.tiwary@cloudfuze.com"},
             {"name": "Aayushi", "email": "aayushi@cloudfuze.com"},
-            {"name": "Bhavani Asok", "email": "bhavani.asok@cloudfuze.com"},
+            {"name": "Bhavani Asok", "email": "Bhavani.Asok@cloudfuze.com"},
             {"name": "Pankaj Rai", "email": "pankaj.rai@cloudfuze.com"},
-            {"name": "Rashmi Ramesh", "email": "rashmi.ramesh@cloudfuze.com"},
+            {"name": "Rashmi Ramesh", "email": "Rashmi.Ramesh@cloudfuze.com"},
             {"name": "Narayana Reddy", "email": "narayana.reddy@cloudfuze.com"},
         ],
         "color": "#06B6D4",  # Cyan
@@ -170,8 +170,8 @@ TEAMS_STRUCTURE = {
             {"name": "Tejaswini Sivakumaram", "email": "sivakumaram.tejaswini@cloudfuze.com"},
             {"name": "Ishwar Yadav", "email": "ishwar.yadav@cloudfuze.com"},
             {"name": "Siva Kota", "email": "siva.kota@cloudfuze.com"},
-            {"name": "Vineetha Yenti", "email": "vineetha.yenti@cloudfuze.com"},
-            {"name": "Ravi Hemanth", "email": "ravi.hemanth@cloudfuze.com"},
+            {"name": "Vineetha Yenti", "email": "Vineetha.Yenti@cloudfuze.com"},
+            {"name": "Ravi Hemanth", "email": "Ravi.Hemanth@cloudfuze.com"},
         ],
         "color": "#F97316",  # Orange
         "description": "M2"
@@ -180,11 +180,11 @@ TEAMS_STRUCTURE = {
         "lead": None,
         "lead_email": None,
         "members": [
-            {"name": "Lakshmi Prasanna", "email": "lakshmi.prasanna@cloudfuze.com"},
-            {"name": "Meena Lakshmi Triveni", "email": "meena.lakshmi@cloudfuze.com"},
+            {"name": "Lakshmi Prasanna", "email": "Lakshmi.Prasanna@cloudfuze.com"},
+            {"name": "Meena Lakshmi Triveni", "email": "Meena.Lakshmi@cloudfuze.com"},
             {"name": "Swaroop", "email": "swaroop@cloudfuze.com"},
-            {"name": "Lakshma Reddy", "email": "lakshma.reddy@cloudfuze.com"},
-            {"name": "Davidraj Dumpala", "email": "davidraj.dumpala@cloudfuze.com"},
+            {"name": "Lakshma Reddy", "email": "LakshmaReddy@cloudfuze.com"},
+            {"name": "Davidraj Dumpala", "email": "Davidraj.Dumpala@cloudfuze.com"},
             {"name": "Srinadh Pala", "email": "srinadh.pala@cloudfuze.com"},
         ],
         "color": "#06C6D4",  # Cyan
@@ -198,7 +198,7 @@ TEAMS_STRUCTURE = {
             {"name": "Nandini Tirumalasetti", "email": "nandini.tirumalasetti@cloudfuze.com"},
             {"name": "Manisha Verma", "email": "manisha.verma@cloudfuze.com"},
             {"name": "Sriram Ramakrishnan", "email": "sriram.ramakrishnan@cloudfuze.com"},
-            {"name": "Ganesh Kondameedi", "email": "ganesh.kondameedi@cloudfuze.com"},
+            {"name": "Ganesh Kondameedi", "email": "Ganesh.Kondameedi@cloudfuze.com"},
             {"name": "Vishnu Gundu", "email": "vishnu.gundu@cloudfuze.com"},
         ],
         "color": "#7C3AED",  # Violet
@@ -210,9 +210,9 @@ TEAMS_STRUCTURE = {
         "members": [
             {"name": "Ajay Singh", "email": "ajay.singh@cloudfuze.com"},
             {"name": "Aanchal Tyagi", "email": "aanchal.tyagi@cloudfuze.com"},
-            {"name": "Akshay Raina", "email": "akshay.raina@cloudfuze.com"},
+            {"name": "Akshay Raina", "email": "Akshay.Raina@cloudfuze.com"},
             {"name": "Dipali", "email": "dipali@cloudfuze.com"},
-            {"name": "Habeebunnisa Begum", "email": "habeebunnisa.begum@cloudfuze.com"},
+            {"name": "Habeebunnisa Begum", "email": "Habeebunnisa.Begum@cloudfuze.com"},
         ],
         "color": "#7C3AED",  # Violet
         "description": "M4 (Messaging + Email)"
@@ -222,9 +222,9 @@ TEAMS_STRUCTURE = {
         "lead_email": None,
         "members": [
             {"name": "Abhishek Sakala", "email": "abhishek.sakala@cloudfuze.com"},
-            {"name": "Pallavi K", "email": "pallavi.kosuvaripalli@cloudfuze.com"},
-            {"name": "Arun Kandula", "email": "arun@cloudfuze.com"},
-            {"name": "Manoj Bathula", "email": "manoj.bathula@cloudfuze.com"},
+            {"name": "Pallavi K", "email": "Pallavi.Kosuvaripalli@cloudfuze.com"},
+            {"name": "Arun Kandula", "email": "Arun@cloudfuze.com"},
+            {"name": "Manoj Bathula", "email": "Manoj.Bathula@cloudfuze.com"},
             {"name": "Sai Pedaparti", "email": "sai.pedaparti@cloudfuze.com"},
         ],
         "color": "#10B981",  # Green
@@ -234,10 +234,10 @@ TEAMS_STRUCTURE = {
         "lead": None,
         "lead_email": None,
         "members": [
-            {"name": "Abhishikth Yenugula", "email": "abhishikth.yenugula@cloudfuze.com"},
-            {"name": "Ranadeep Muddam", "email": "ranadeep.muddam@cloudfuze.com"},
-            {"name": "Amulya Anapuram", "email": "amulya.anapuram@cloudfuze.com"},
-            {"name": "Vijendar Burgula", "email": "vijendar.burgula@cloudfuze.com"},
+            {"name": "Abhishikth Yenugula", "email": "Abhishikth.Yenugula@cloudfuze.com"},
+            {"name": "Ranadeep Muddam", "email": "Ranadeep.Muddam@cloudfuze.com"},
+            {"name": "Amulya Anapuram", "email": "Amulya.Anapuram@cloudfuze.com"},
+            {"name": "Vijendar Burgula", "email": "Vijendar.Burgula@cloudfuze.com"},
         ],
         "color": "#EC4899",  # Pink
         "description": "M5"
@@ -247,13 +247,13 @@ TEAMS_STRUCTURE = {
         "lead_email": None,
         "members": [
             {"name": "Karthik Brahmakal", "email": "karthik.brahmakal@cloudfuze.com"},
-            {"name": "Pruthvi Raygol", "email": "pruthvi.raygol@cloudfuze.com"},
-            {"name": "Vijay Kumar", "email": "vijay.kumar@cloudfuze.com"},
+            {"name": "Pruthvi Raygol", "email": "Pruthvi.Raygol@cloudfuze.com"},
+            {"name": "Vijay Kumar", "email": "Vijay.Kumar@cloudfuze.com"},
             {"name": "Craig Fernandez", "email": "craig.fernandez@cloudfuze.com"},
             {"name": "Rebecca Valentina", "email": "rebecca.valentina@cloudfuze.com"},
-            {"name": "Sushmitha Esther", "email": "sushmitha.esther@cloudfuze.com"},
-            {"name": "Hrushikesh Sholapure", "email": "hrushikesh.sholapure@cloudfuze.com"},
-            {"name": "Preethi John", "email": "preethi.john@cloudfuze.com"},
+            {"name": "Sushmitha Esther", "email": "Sushmitha.Esther@cloudfuze.com"},
+            {"name": "Hrushikesh Sholapure", "email": "Hrushikesh.Sholapure@cloudfuze.com"},
+            {"name": "Preethi John", "email": "Preethi.John@cloudfuze.com"},
             {"name": "Kevin Anto", "email": "kevin.anto@cloudfuze.com"},
         ],
         "color": "#06B6D4",  # Cyan
@@ -264,9 +264,9 @@ TEAMS_STRUCTURE = {
         "lead_email": None,
         "members": [
             {"name": "Rahul Gowda", "email": "rahul.gowda@cloudfuze.com"},
-            {"name": "Sakshi Priya", "email": "sakshi.priya@cloudfuze.com"},
-            {"name": "Raya Durai", "email": "raya.durai@cloudfuze.com"},
-            {"name": "Varsha Nallashami", "email": "varsha.nallashami@cloudfuze.com"},
+            {"name": "Sakshi Priya", "email": "Sakshi.Priya@cloudfuze.com"},
+            {"name": "Raya Durai", "email": "Raya.durai@cloudfuze.com"},
+            {"name": "Varsha Nallashami", "email": "Varsha.Nallashami@cloudfuze.com"},
             {"name": "Sanjana Khanapur", "email": "sanjana.khanapur@cloudfuze.com"},
         ],
         "color": "#8B5CF6",  # Purple
@@ -277,10 +277,10 @@ TEAMS_STRUCTURE = {
         "lead_email": None,
         "members": [
             {"name": "Chitradip Saha", "email": "chitradip.saha@cloudfuze.com"},
-            {"name": "Royston Aden", "email": "Royston.Aden@cloudfuze.com"},
+            {"name": "Royston Aden", "email": "RoystonAden@cloudfuze.com"},
             {"name": "Deepak R J", "email": "Deepak.Rj@cloudfuze.com"},
             {"name": "Vicky Cariappa", "email": "vicky.cariappa@cloudfuze.com"},
-            {"name": "Yogesh Vig", "email": "Yogesh.vig@cloudfuze.com"},
+            {"name": "Yogesh Vig", "email": "Yogesh.Talurmath@cloudfuze.com"},
             {"name": "Kartik Kashyap", "email": "Kartik.Kashyap@cloudfuze.com"},
             {"name": "Kritika Gupta", "email": "Kritika.Gupta@cloudfuze.com"},
         ],
@@ -292,7 +292,7 @@ TEAMS_STRUCTURE = {
         "lead_email": None,
         "members": [
             {"name": "Anthony Raymond", "email": "anthony@cloudfuze.com"},
-            {"name": "Lukas Bohlander", "email": "lukas.bohlander@cloudfuze.com"},
+            {"name": "Lukas Bohlander", "email": "Lukas.Bohlander@cloudfuze.com"},
             {"name": "Charles Stiltner", "email": "charles.stiltner@cloudfuze.com"},
         ],
         "color": "#EF4444",  # Red
@@ -304,10 +304,10 @@ TEAMS_STRUCTURE = {
         "members": [
             {"name": "Lawrence Lewis", "email": "lawrence.lewis@cloudfuze.com"},
             {"name": "Nikitha Shekher", "email": "nikita.shekher@cloudfuze.com"},
-            {"name": "Joy Prakash", "email": "joy.prakash@cloudfuze.com"},
-            {"name": "Jalsha Chakma", "email": "jalsha.chakma@cloudfuze.com"},
-            {"name": "Vivin Joseph", "email": "vivin.joseph@cloudfuze.com"},
-            {"name": "Bhima Raju", "email": "bhimaraju.patsamatla@cloudfuze.com"},
+            {"name": "Joy Prakash", "email": "Joy.Prakash@cloudfuze.com"},
+            {"name": "Jalsha Chakma", "email": "Jalsha.Chakma@cloudfuze.com"},
+            {"name": "Vivin Joseph", "email": "Vivin.Joseph@cloudfuze.com"},
+            {"name": "Bhima Raju", "email": "BhimaRaju.Patsamatla@cloudfuze.com"},
             {"name": "Garima Patel", "email": "garima.patel@cloudfuze.com"},
         ],
         "color": "#10B981",  # Green
@@ -320,7 +320,7 @@ TEAMS_STRUCTURE = {
             {"name": "Gopi Krishna", "email": "gopi@cloudfuze.com"},
             {"name": "Vipra Mishra", "email": "vipra.mishra@cloudfuze.com"},
             {"name": "Sujana Manapuram", "email": "sujana.manapuram@cloudfuze.com"},
-            {"name": "Madhuri Yeleswarapu", "email": "madhuri.yeleswarapu@cloudfuze.com"},
+            {"name": "Madhuri Yeleswarapu", "email": "Madhuri.Yeleswarapu@cloudfuze.com"},
             {"name": "Pooja Parmar", "email": "pooja.parmar@cloudfuze.com"},
         ],
         "color": "#3B82F6",  # Blue
@@ -330,7 +330,8 @@ TEAMS_STRUCTURE = {
         "lead": None,
         "lead_email": None,
         "members": [
-            {"name": "Raghavan Krishnan", "email": "raghavan.krishnan@cloudfuze.com"},
+            {"name": "Raghavan Krishnan", "email": "Raghavan.Krishnan@cloudfuze.com"},
+            {"name": "Himansu Malla", "email": "Himansu.Malla@cloudfuze.com"},
         ],
         "color": "#64748B",  # Slate Gray
         "description": "Manager"
