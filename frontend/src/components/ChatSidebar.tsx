@@ -13,6 +13,7 @@ import {
   setCurrentSessionId
 } from '@/lib/session-utils';
 import { isAdminEmail } from '@/constants/admins';
+import { apiFetch } from '@/lib/api';
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -191,9 +192,15 @@ export default function ChatSidebar({
         // Navigate based on chat type
         // NOTE: Sidebar will remain open during navigation (no onToggle called)
         if (isOthers) {
-          // Navigate to others' session (read-only)
-          // Sidebar stays open
-          router.push(`/chat/others/${sid}`);
+          // Client-side load for others' session (read-only) - no page reload
+          if (typeof (window as any).loadOthersSession === 'function') {
+            (window as any).loadOthersSession(sid);
+            // Update URL without page reload
+            window.history.pushState({}, '', `/chat/others/${sid}`);
+          } else {
+            // Fallback to router if function not available
+            router.push(`/chat/others/${sid}`);
+          }
         } else {
           // Navigate to own session
           // Sidebar stays open
@@ -431,10 +438,26 @@ export default function ChatSidebar({
     }
   };
 
-  // Handle logout confirmation
-  const handleLogoutConfirm = () => {
-    localStorage.removeItem('user');
-    router.replace('/login');
+  // ✅ NEW: Handle logout confirmation (session-based auth)
+  const handleLogoutConfirm = async () => {
+    try {
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch('/auth/logout', {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        console.log('[AUTH] ✅ Logged out successfully');
+      } else {
+        console.warn('[AUTH] Logout endpoint failed, clearing local data anyway');
+      }
+    } catch (error) {
+      console.error('[AUTH] Logout error:', error);
+    } finally {
+      // Always clear local data and redirect
+      localStorage.removeItem('user');
+      router.replace('/login');
+    }
   };
 
   // Handle logout cancel

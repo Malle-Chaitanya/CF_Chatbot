@@ -2,21 +2,26 @@
 """
 Authentication and Authorization Module
 
-Implements OAuth2 security using FastAPI's dependency injection pattern.
-Validates Microsoft OAuth tokens and enforces access control.
+Implements session-based authentication using backend session storage.
+Microsoft Graph API is called ONLY during login, not on every request.
+
+This solves the "random expiration" issue by:
+1. Creating a session ONCE during login (Graph API called only here)
+2. Validating sessions from MongoDB on every request (no Graph API calls)
+3. Refreshing tokens in the background without user interruption
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import httpx
 from typing import Optional, Dict
 import logging
 from typing import Set
+from datetime import datetime
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# OAuth2 Bearer token security scheme
+# OAuth2 Bearer token security scheme (for backward compatibility during migration)
 security = HTTPBearer()
 
 # Restricted admin allowlist (lowercase for consistent comparison)
@@ -33,21 +38,80 @@ def _normalize_email(email: str) -> str:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    request: Request,
+    session_id: Optional[str] = Cookie(None, alias="session_id"),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
 ) -> Dict[str, str]:
     """
-    Validate Microsoft OAuth access token and return authenticated user information.
+    Get authenticated user from session (NEW: session-based auth).
+    Falls back to token-based auth for backward compatibility during migration.
+    
+    Priority:
+    1. Session cookie (preferred - no Graph API call)
+    2. Bearer token (legacy - calls Graph API)
     
     Args:
-        credentials: Bearer token from Authorization header
+        request: FastAPI request object
+        session_id: Session ID from cookie
+        credentials: Optional Bearer token (for backward compatibility)
         
     Returns:
         Dictionary containing user_id, email, and name
         
     Raises:
-        HTTPException: 401 if token is invalid or expired
+        HTTPException: 401 if session/token is invalid or expired
     """
-    access_token = credentials.credentials
+    from app.session_store import session_store
+    
+    # PRIORITY 1: Try session-based auth (no Graph API call)
+    if session_id:
+        try:
+            await session_store.connect()
+            session = await session_store.get_session(session_id)
+            
+            if session:
+                # Check if token needs refresh (but don't block request)
+                token_expires_at = session.get("token_expires_at")
+                if token_expires_at and isinstance(token_expires_at, datetime):
+                    from datetime import timedelta
+                    now = datetime.utcnow()
+                    margin = timedelta(minutes=5)
+                    
+                    if token_expires_at - now < margin:
+                        # Token expiring soon - refresh in background (non-blocking)
+                        logger.info(f"[AUTH] Token expiring soon for session {session_id[:8]}..., refreshing in background")
+                        # Background refresh will be handled by token refresh endpoint
+                
+                logger.debug(f"[AUTH] User authenticated via session: {session['user_email']}")
+                return {
+                    "id": session["user_id"],
+                    "email": session["user_email"],
+                    "name": session["user_name"]
+                }
+        except Exception as e:
+            logger.warning(f"[AUTH] Session validation failed: {e}, falling back to token auth")
+    
+    # PRIORITY 2: Fallback to token-based auth (for backward compatibility)
+    if credentials:
+        logger.warning("[AUTH] Using legacy token-based auth (should migrate to sessions)")
+        return await _get_current_user_from_token(credentials.credentials)
+    
+    # No valid session or token
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Unauthorized: No valid session or token. Please log in.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+async def _get_current_user_from_token(access_token: str) -> Dict[str, str]:
+    """
+    Legacy token-based authentication (calls Microsoft Graph API).
+    Used only as fallback during migration to session-based auth.
+    
+    This function will be removed once all clients use session cookies.
+    """
+    import httpx
     
     try:
         # Verify token with Microsoft Graph API
@@ -97,7 +161,7 @@ async def get_current_user(
                     detail="Access denied. Only CloudFuze company accounts are allowed.",
                 )
             
-            logger.info(f"User authenticated successfully: {user_id} ({user_email})")
+            logger.info(f"User authenticated successfully via token: {user_id} ({user_email})")
             
             return {
                 "id": user_id,

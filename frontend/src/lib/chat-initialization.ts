@@ -3,7 +3,8 @@
 
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import type { ChatSession } from '@/types/chat';
-import { fetchAndMergeUserSessions } from '@/lib/session-utils';
+import { fetchAndMergeUserSessions, getCurrentUser } from '@/lib/session-utils';
+import { apiFetch } from '@/lib/api';
 
 // Character limit constants
 const MAX_PROMPT_LENGTH = 20000; // ~5K tokens (safe for RAG)
@@ -56,27 +57,6 @@ export function initializeChatApp(options: InitOptions = {}) {
     console.log('[CHAT] Previous session continues generating in background');
   }
   
-  // API Base URL configuration
-  function getApiBase() {
-    const hostname = window.location.hostname;
-    
-    // Development environment
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
-    }
-    
-    // Production environments - always use HTTPS
-    if (hostname === 'ai.cloudfuze.com') {
-      return 'https://ai.cloudfuze.com';
-    }
-    
-    // Default fallback - use current origin, force HTTPS in production
-    const origin = window.location.origin;
-    if (origin.startsWith('http://') && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return origin.replace('http://', 'https://');
-    }
-    return origin;
-  }
 
   const messagesDiv = document.getElementById("messages");
   const input = document.getElementById("user-input") as HTMLTextAreaElement;
@@ -478,6 +458,13 @@ export function initializeChatApp(options: InitOptions = {}) {
       return;
     }
     
+    // ✅ FIX: Prevent saving others' chats (read-only mode) to MY CHATS
+    // Only save when user explicitly clicks "Continue in this thread"
+    if (isReadOnlyMode) {
+      console.log('[SESSION SAVE] ⏭️ Skipping save — read-only mode (others\' chat)');
+      return;
+    }
+    
     const sessions = getAllSessions();
     const messages = Array.from(messagesDiv!.children)
       .map((child, index) => {
@@ -633,20 +620,15 @@ export function initializeChatApp(options: InitOptions = {}) {
     syncSessionToBackend(sessions[sessionIndex]);
   }
   
-  // Sync session metadata to backend
+  // ✅ NEW: Sync session metadata to backend (session-based auth)
   async function syncSessionToBackend(sessionData: ChatSession) {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || 'null');
-      if (!user || !user.access_token) return;
-      
+      // ✅ Session-based auth - no token check needed, session_id cookie sent automatically
       console.log('[SESSION SYNC] Syncing to backend with', sessionData.messages.length, 'messages');
       
-      const response = await fetch(`${getApiBase()}/chat/sessions/save`, {
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch('/chat/sessions/save', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.access_token}`
-        },
         body: JSON.stringify({
           session_id: sessionData.id,
           title: sessionData.title,
@@ -667,18 +649,12 @@ export function initializeChatApp(options: InitOptions = {}) {
     }
   }
   
-  // Fetch all users' chats (one recent chat per user)
+  // ✅ NEW: Fetch all users' chats (session-based auth)
   async function fetchAllUsersChats(): Promise<OtherUserChat[]> {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || 'null');
-      if (!user || !user.access_token) return [];
-      
-      const response = await fetch(`${getApiBase()}/chat/sessions/all?limit=15`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.access_token}`
-        }
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch('/chat/sessions/all?limit=15', {
+        method: 'GET'
       });
       
       if (response.ok) {
@@ -694,15 +670,9 @@ export function initializeChatApp(options: InitOptions = {}) {
     }
   }
   
-  // Load another user's chat session (read-only)
+  // ✅ NEW: Load another user's chat session (read-only, session-based auth)
   async function loadOthersSession(otherSessionId: string) {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || 'null');
-      if (!user || !user.access_token) {
-        console.error('[SESSION] No authentication for loading others session');
-        return;
-      }
-      
       // Set read-only mode
       isReadOnlyMode = true;
       
@@ -711,13 +681,9 @@ export function initializeChatApp(options: InitOptions = {}) {
       // Extract user_id from session_id (format: "user_chat_{user_id}")
       const userId = otherSessionId.replace('user_chat_', '');
       
-      // Fetch actual messages from backend
-      const response = await fetch(`${getApiBase()}/chat/sessions/messages/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.access_token}`
-        }
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch(`/chat/sessions/messages/${userId}`, {
+        method: 'GET'
       });
       
       if (response.status === 403) {
@@ -892,6 +858,9 @@ export function initializeChatApp(options: InitOptions = {}) {
   // Expose continueInThisThread to window for onclick handler
   (window as any).continueInThisThread = continueInThisThread;
   
+  // Expose loadOthersSession globally for client-side navigation from sidebar
+  (window as any).loadOthersSession = loadOthersSession;
+  
   // Share chat functionality
   async function shareChat() {
     // Get share button reference
@@ -922,27 +891,20 @@ export function initializeChatApp(options: InitOptions = {}) {
         return;
       }
       
-      // Determine API base URL
-      const API_BASE_URL = getApiBase();
-      
-      // Get user token
-      const user = JSON.parse(localStorage.getItem('user') || 'null');
-      if (!user || !user.access_token) {
+      // ✅ FIX 2: Session-based auth - check user exists (no token needed)
+      const user = getCurrentUser();
+      if (!user) {
         showToast('Authentication required to share chat', 'error', 3000);
-        console.warn('[SHARE] No authentication token available');
+        console.warn('[SHARE] User not authenticated');
+        window.location.href = '/login';
         return;
       }
       
       console.log('[SHARE] Attempting to share session:', sessionId);
-      console.log('[SHARE] API Base URL:', API_BASE_URL);
       
-      // Call backend API to create share link
-      const response = await fetch(`${API_BASE_URL}/chat/share/${sessionId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${user.access_token}`,
-          'Content-Type': 'application/json'
-        }
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch(`/chat/share/${sessionId}`, {
+        method: 'POST'
       });
       
       console.log('[SHARE] Response status:', response.status);
@@ -1356,6 +1318,12 @@ export function initializeChatApp(options: InitOptions = {}) {
   // Update sidebar immediately when a new message is sent (before response)
   function updateSidebarImmediately() {
     if (!sessionId) return;
+    
+    // ✅ FIX: Don't update sidebar for others' chats (read-only mode)
+    if (isReadOnlyMode) {
+      console.log('[SIDEBAR] ⏭️ Skipping sidebar update — read-only mode (others\' chat)');
+      return;
+    }
     
     const sidebarHistory = document.getElementById('sidebar-history');
     if (!sidebarHistory) return;
@@ -2272,39 +2240,25 @@ export function initializeChatApp(options: InitOptions = {}) {
     setTimeout(() => autoScrollToBottom(), 50);
 
     try {
-      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
-      if (!currentUser || !currentUser.access_token) {
+      // ✅ FIX 2: Session-based auth - check user exists (no token needed)
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
         console.error("[CHAT] User not authenticated, redirecting to login");
         localStorage.removeItem('user');
         window.location.href = "/login";
         return;
       }
       
-      // ✅ PHASE 3: Ensure token is valid before API call
-      const { ensureValidToken } = await import('@/lib/session-utils');
-      const tokenValid = await ensureValidToken();
-      if (!tokenValid) {
-        console.error("[CHAT] Token invalid or refresh failed, redirecting to login");
-        localStorage.removeItem('user');
-        window.location.href = "/login?error=session_expired";
-        return;
-      }
-      
-      // Get updated user after potential token refresh
-      const refreshedUser = JSON.parse(localStorage.getItem('user') || 'null');
-      
+      // ✅ FIX 2: Session-based auth - no token validation needed
+      // Session is validated automatically by backend via session_id cookie
       const requestBody = { 
         question,
         session_id: sessionId
       };
       
-      // ✅ PHASE 2.5.4: Removed signal - streams complete independently of navigation
-      const response = await fetch(`${getApiBase()}/chat/stream`, {
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch('/chat/stream', {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${refreshedUser.access_token}`
-        },
         body: JSON.stringify(requestBody),
         // No signal - allows streams to complete even when user navigates away
       });
@@ -2730,35 +2684,9 @@ export function initializeChatApp(options: InitOptions = {}) {
         return;
       }
       
-      const apiBase = getApiBase();
-      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
-      
-      if (!currentUser || !currentUser.access_token) {
-        console.error('[FEEDBACK] User not authenticated');
-        // Re-enable buttons
-        feedbackButtons.forEach((btn) => {
-          const buttonEl = btn as HTMLButtonElement;
-          buttonEl.disabled = false;
-          buttonEl.style.cursor = 'pointer';
-          buttonEl.style.opacity = '1';
-        });
-        if (feedbackText) {
-          feedbackText.textContent = 'Authentication required';
-          (feedbackText as HTMLElement).style.color = '#dc3545';
-          setTimeout(() => {
-            feedbackText.textContent = '';
-            (feedbackText as HTMLElement).style.color = '';
-          }, 3000);
-        }
-        return;
-      }
-      
-      const response = await fetch(`${apiBase}/feedback`, {
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch('/feedback', {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${currentUser.access_token}`
-        },
         body: JSON.stringify({
           trace_id: traceId,  // ✅ Always use real trace_id (no fallback)
           rating: rating,
@@ -3008,35 +2936,9 @@ export function initializeChatApp(options: InitOptions = {}) {
         return;
       }
       
-      const apiBase = getApiBase();
-      const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
-      
-      if (!currentUser || !currentUser.access_token) {
-        console.error('[FEEDBACK] User not authenticated');
-        // Re-enable buttons
-        feedbackButtons.forEach((btn) => {
-          const buttonEl = btn as HTMLButtonElement;
-          buttonEl.disabled = false;
-          buttonEl.style.cursor = 'pointer';
-          buttonEl.style.opacity = '1';
-        });
-        if (feedbackText) {
-          feedbackText.textContent = 'Authentication required. Please refresh the page.';
-          feedbackText.style.color = '#dc3545';
-          setTimeout(() => {
-            feedbackText.textContent = '';
-            feedbackText.style.color = '';
-          }, 5000);
-        }
-        return;
-      }
-      
-      const response = await fetch(`${apiBase}/feedback`, {
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch('/feedback', {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${currentUser.access_token}`
-        },
         body: JSON.stringify({
           trace_id: traceId,  // ✅ Always use real trace_id (no fallback)
           rating: 'thumbs_down',
@@ -3348,15 +3250,8 @@ export function initializeChatApp(options: InitOptions = {}) {
       }
       
       console.log('[QUESTIONS] Loading dynamic suggested questions...');
-      // Use relative URL in production (automatically uses correct protocol)
-      // Use full URL in development
-      const apiBase = getApiBase();
-      const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const apiUrl = isLocalDev 
-        ? `${apiBase}/api/suggested-questions/?limit=4`
-        : '/api/suggested-questions/?limit=4';
-      
-      const response = await fetch(apiUrl);
+      // ✅ Use apiFetch for all backend calls
+      const response = await apiFetch('/api/suggested-questions/?limit=4');
       
       if (!response.ok) {
         console.error('[QUESTIONS] Failed to load questions:', response.status);
@@ -3456,12 +3351,14 @@ export function initializeChatApp(options: InitOptions = {}) {
   
   // Initialize auth - simplified since auth check is done at component level
   async function initAuth() {
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    // ✅ FIX 2: Session-based auth - check user exists (no token needed)
+    const user = getCurrentUser();
     
     // User is already authenticated at this point (checked in component)
     // Just load user info and chat history
-    if (user && user.access_token) {
-      updateUserInfo(user);
+    if (user) {
+      // ✅ User type is compatible - no token fields needed
+      updateUserInfo(user as any);
       
       // If switching sessions, skip full reload and only reload session data
       if (isSwitchingSession) {
@@ -3628,14 +3525,14 @@ export function initializeChatApp(options: InitOptions = {}) {
     }
   }
 
-  // Legacy function - keeping for potential future backend integration
+  // ❌ DEPRECATED: Legacy function - use session-based auth instead
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function loadUserChatHistory(userId: string, accessToken: string) {
+    console.warn('[AUTH] loadUserChatHistory() is deprecated - use session-based auth');
     try {
-      const response = await fetch(`${getApiBase()}/chat/history/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch(`/chat/history/${userId}`, {
+        method: 'GET'
       });
       
       if (response.ok) {
@@ -3727,18 +3624,13 @@ export function initializeChatApp(options: InitOptions = {}) {
       saveCurrentSession();
     }
     
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
-    if (user && user.id && user.access_token) {
-      try {
-        await fetch(`${getApiBase()}/chat/history/${user.id}`, {
-          method: "DELETE",
-          headers: {
-            'Authorization': `Bearer ${user.access_token}`
-          }
-        });
-      } catch (error) {
-        console.error('Failed to clear chat history:', error);
-      }
+    // ✅ Session-based auth - session_id cookie sent automatically via proxy
+    try {
+      await apiFetch(`/chat/history/${getCurrentUser()?.id || ''}`, {
+        method: "DELETE"
+      });
+    } catch (error) {
+      console.error('Failed to clear chat history:', error);
     }
     
     // Clear old recommended questions
@@ -3787,9 +3679,26 @@ export function initializeChatApp(options: InitOptions = {}) {
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem('user');
-    window.location.href = "/login";
+  // ✅ NEW: Handle logout (session-based auth)
+  async function handleLogout() {
+    try {
+      // ✅ Session-based auth - session_id cookie sent automatically via proxy
+      const response = await apiFetch('/auth/logout', {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        console.log('[AUTH] ✅ Logged out successfully');
+      } else {
+        console.warn('[AUTH] Logout endpoint failed, clearing local data anyway');
+      }
+    } catch (error) {
+      console.error('[AUTH] Logout error:', error);
+    } finally {
+      // Always clear local data and redirect
+      localStorage.removeItem('user');
+      window.location.href = "/login";
+    }
   }
 
   function toggleDropdown() {

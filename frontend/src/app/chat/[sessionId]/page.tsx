@@ -6,12 +6,13 @@ import ChatSidebar from '@/components/ChatSidebar';
 import ChatInterface from '@/components/ChatInterface';
 import { 
   getCurrentUser, 
-  verifyToken, 
+  checkSession,
   getSessionById, 
   setCurrentSessionId,
   loadOthersSession
 } from '@/lib/session-utils';
 import { ChatSession } from '@/types/chat';
+import { apiFetch } from '@/lib/api';
 
 export default function ChatSessionPage() {
   const router = useRouter();
@@ -46,12 +47,7 @@ export default function ChatSessionPage() {
     }
   }, [isSidebarOpen]);
 
-  // Verify token with Microsoft Graph API
-  const verifyTokenCallback = useCallback(async (accessToken: string): Promise<boolean> => {
-    return await verifyToken(accessToken);
-  }, []);
-
-  // Authentication check BEFORE rendering
+  // ✅ Simple session check (cookie-based auth only)
   useEffect(() => {
     if (authCheckRef.current) {
       console.log('[AUTH] Auth check already in progress, skipping');
@@ -62,74 +58,24 @@ export default function ChatSessionPage() {
     
     const checkAuth = async () => {
       try {
-        // Check if this is client-side navigation (not a full page load)
-        let isClientSideNavigation = false;
-        let isBackForwardNavigation = false;
+        // ✅ Simple session check - no token logic
+        const isLoggedIn = await checkSession();
         
-        try {
-          const navEntries = window.performance.getEntriesByType('navigation');
-          if (navEntries.length > 0) {
-            const navEntry = navEntries[0] as PerformanceNavigationTiming;
-            isBackForwardNavigation = navEntry.type === 'back_forward';
-            // If navigation type is 'navigate' but we have user in localStorage, it's likely client-side nav
-            const localUser = getCurrentUser();
-            isClientSideNavigation = navEntry.type === 'navigate' && !!localUser;
-            if (isBackForwardNavigation) {
-              console.log('[AUTH] Detected back/forward navigation, skipping token verification');
-            }
-            if (isClientSideNavigation) {
-              console.log('[AUTH] Detected client-side navigation, skipping token verification');
-            }
-          }
-        } catch (e) {
-          // Performance API not available, check if user exists (likely client-side nav)
-          isClientSideNavigation = !!getCurrentUser();
+        if (!isLoggedIn) {
+          console.log('[AUTH] No valid session, redirecting to login');
+          localStorage.removeItem('user');
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          router.replace('/login');
+          return;
         }
-        
+
+        // Get user info for UI (optional - session is validated by cookie)
         const currentUser = getCurrentUser();
+        if (currentUser) {
+          console.log('[AUTH] ✅ User authenticated via session:', currentUser.email);
+        }
         
-        if (!currentUser) {
-          console.log('[AUTH] No user found, redirecting to login');
-          setIsAuthenticated(false);
-          setIsLoading(false);
-          router.replace('/login');
-          return;
-        }
-
-        if (!currentUser.access_token) {
-          console.log('[AUTH] No access token found, redirecting to login');
-          localStorage.removeItem('user');
-          setIsAuthenticated(false);
-          setIsLoading(false);
-          router.replace('/login');
-          return;
-        }
-
-        // Skip token verification for client-side navigation (already authenticated)
-        if (!isBackForwardNavigation && !isClientSideNavigation) {
-          console.log('[AUTH] Verifying access token...');
-          const isValid = await verifyTokenCallback(currentUser.access_token);
-          
-          if (!isValid) {
-            console.log('[AUTH] Token is invalid or expired, redirecting to login');
-            localStorage.removeItem('user');
-            setIsAuthenticated(false);
-            setIsLoading(false);
-            router.replace('/login?error=session_expired');
-            return;
-          }
-        }
-
-        if (!currentUser.email || !currentUser.email.endsWith('@cloudfuze.com')) {
-          console.log('[AUTH] Non-CloudFuze email detected, redirecting to login');
-          localStorage.removeItem('user');
-          setIsAuthenticated(false);
-          setIsLoading(false);
-          router.replace('/login?error=unauthorized_domain&email=' + encodeURIComponent(currentUser.email || ''));
-          return;
-        }
-
-        console.log('[AUTH] User authenticated successfully:', currentUser.email);
         setIsAuthenticated(true);
         setIsLoading(false);
         
@@ -138,14 +84,14 @@ export default function ChatSessionPage() {
         localStorage.removeItem('user');
         setIsAuthenticated(false);
         setIsLoading(false);
-        router.replace('/login?error=verification_failed');
+        router.replace('/login');
       } finally {
         authCheckRef.current = false;
       }
     };
 
     checkAuth();
-  }, [router, verifyTokenCallback]);
+  }, [router]);
 
   // Load session data after authentication
   useEffect(() => {
@@ -187,27 +133,9 @@ export default function ChatSessionPage() {
             throw new Error('Not authenticated');
           }
           
-          // Determine API base URL
-          const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-          let apiBase = '';
-          
-          if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
-          } else if (hostname === 'ai.cloudfuze.com') {
-            apiBase = 'https://ai.cloudfuze.com';
-          } else {
-            const origin = typeof window !== 'undefined' ? window.location.origin : '';
-            apiBase = origin.startsWith('http://') && hostname !== 'localhost' && hostname !== '127.0.0.1'
-              ? origin.replace('http://', 'https://')
-              : origin;
-          }
-          
-          const response = await fetch(`${apiBase}/chat/sessions/${sessionId}?include_messages=true`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${user.access_token}`
-            }
+          // ✅ Session-based auth - session_id cookie sent automatically via proxy
+          const response = await apiFetch(`/chat/sessions/${sessionId}?include_messages=true`, {
+            method: 'GET'
           });
           
           if (response.ok) {

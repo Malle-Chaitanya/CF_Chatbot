@@ -2,7 +2,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from app.endpoints import router as chat_router
 from app.routes.suggested_questions import router as questions_router
 from app.mongodb_memory import close_mongodb_connection
@@ -110,11 +109,27 @@ async def auto_seed_questions():
 
 app = FastAPI(lifespan=lifespan)
 
-# Add CORS middleware
+# ✅ FIX: CORS configuration for session cookies
+# When allow_credentials=True, you CANNOT use allow_origins=["*"]
+# Must specify exact origins
+allowed_origins = [
+    "http://localhost:3000",  # Next.js dev server
+    "http://127.0.0.1:3000",  # Alternative localhost
+    "http://localhost:3001",  # Alternative port
+    "https://ai.cloudfuze.com",  # Production
+]
+
+# Add development origins from environment if set
+dev_origin = os.getenv("FRONTEND_URL")
+if dev_origin and dev_origin not in allowed_origins:
+    allowed_origins.append(dev_origin)
+
+logger.info(f"[CORS] Allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,  # Enable credentials for OAuth
+    allow_origins=allowed_origins,  # ✅ FIX: Specific origins (required for credentials)
+    allow_credentials=True,  # ⭐ REQUIRED for session cookies
     allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
 )
@@ -136,15 +151,6 @@ app.mount("/images", StaticFiles(directory="images"), name="images")
 # Only mount /data if the directory exists
 if os.path.exists("data"):
     app.mount("/data", StaticFiles(directory="data"), name="data")
-
-# Serve HTML files
-@app.get("/login.html")
-async def serve_login():
-    return FileResponse("login.html")
-
-@app.get("/index.html")
-async def serve_index():
-    return FileResponse("index.html")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8002)

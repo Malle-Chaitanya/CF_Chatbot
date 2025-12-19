@@ -1,26 +1,26 @@
 'use client';
 
 import { useEffect } from 'react';
-import { startTokenMonitor, stopTokenMonitor } from '@/lib/session-utils';
+import { startSessionMonitor, stopSessionMonitor } from '@/lib/session-utils';
 
 /**
- * TokenMonitor component that runs background token refresh checks.
+ * SessionMonitor component that runs background session refresh checks.
  * This component should be included once at the app level.
  * 
  * Features:
- * - Checks token expiration every 2 minutes
- * - Automatically refreshes tokens before they expire
- * - Shows notification when refreshing
+ * - Checks session validity every 5 minutes
+ * - Automatically refreshes session tokens if needed
  * - Ensures seamless "never expire" user experience
+ * - Uses cookie-based session authentication
  */
 export default function TokenMonitor() {
   useEffect(() => {
-    // Start the background token monitor
-    startTokenMonitor();
+    // Start the background session monitor
+    startSessionMonitor();
     
     // Cleanup on unmount
     return () => {
-      stopTokenMonitor();
+      stopSessionMonitor();
     };
   }, []);
   

@@ -58,8 +58,6 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
-      - ./index.html:/var/www/html/index.html
-      - ./login.html:/var/www/html/login.html
       - ./images:/var/www/html/images
     depends_on:
       - backend

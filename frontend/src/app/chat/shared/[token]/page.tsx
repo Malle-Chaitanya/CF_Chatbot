@@ -103,7 +103,7 @@ export default function SharedChatPage() {
         let apiBase = '';
         
         if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
+          apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002';
         } else if (hostname === 'ai.cloudfuze.com') {
           apiBase = 'https://ai.cloudfuze.com';
         } else {

@@ -1,12 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { apiFetch } from '@/lib/api';
+import { checkSession } from '@/lib/session-utils';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const checkedRef = useRef(false);
+
   useEffect(() => {
+    // ✅ Strict-mode safe: prevent double execution
+    if (checkedRef.current) return;
+    checkedRef.current = true;
+
     initializeLoginPage();
-  }, []);
+  }, [router]);
 
   return (
     <>
@@ -37,21 +47,10 @@ function initializeLoginPage() {
   const MICROSOFT_REDIRECT_URI = window.location.origin + '/login';
   const MICROSOFT_SCOPE = "openid email profile User.Read";
 
-  // API Base URL configuration
-  function getApiBase() {
-    const hostname = window.location.hostname;
-    
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
-    }
-    
-    return window.location.origin;
-  }
-
   // Load Microsoft OAuth configuration from backend
   async function loadOAuthConfig() {
     try {
-      const response = await fetch(`${getApiBase()}/auth/config`);
+      const response = await apiFetch('/auth/config');
       if (response.ok) {
         const config = await response.json();
         MICROSOFT_CLIENT_ID = config.client_id;
@@ -88,51 +87,20 @@ function initializeLoginPage() {
       .replace(/=/g, '');
   }
 
-  // Check if user is already logged in
-  function checkAuthStatus() {
-    // Don't check auth status if we're currently processing an OAuth callback
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('code')) {
-      console.log('OAuth callback in progress, skipping auth check');
-      return;
-    }
+  // ✅ Simple session check (session-based auth only)
+  async function checkSessionStatus() {
+    console.log('[AUTH] Checking session status...');
     
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
-    if (user && user.access_token) {
-      console.log('User found in localStorage, verifying token...');
-      
-      showLoadingIndicator('Checking authentication...');
-      
-      verifyToken(user.access_token).then(isValid => {
-        hideLoadingIndicator();
-        if (isValid) {
-          console.log('Token is valid, redirecting to main page');
-          window.location.href = "/";
-        } else {
-          console.log('Token is invalid, clearing user data');
-          localStorage.removeItem('user');
-          showError('Your session has expired. Please sign in again.');
-        }
-      }).catch(error => {
-        console.error('Token verification failed:', error);
-        hideLoadingIndicator();
-        localStorage.removeItem('user');
-        showError('Authentication check failed. Please sign in again.');
-      });
-    }
-  }
-
-  // Verify Microsoft access token
-  async function verifyToken(accessToken: string) {
-    try {
-      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-      return response.ok;
-    } catch {
-      return false;
+    const isLoggedIn = await checkSession();
+    
+    if (isLoggedIn) {
+      // Session is valid - user is logged in
+      console.log('[AUTH] ✅ Session valid, redirecting to main page');
+      window.location.href = "/";
+    } else {
+      // Session expired or invalid - stay on login page
+      console.log('[AUTH] No valid session');
+      localStorage.removeItem('user');
     }
   }
 
@@ -141,7 +109,7 @@ function initializeLoginPage() {
     event.preventDefault();
     
     sessionStorage.removeItem('code_verifier');
-    localStorage.removeItem('user');
+    localStorage.removeItem('user'); // Clear any old user data
     
     // Save redirect URL before starting OAuth (use both sessionStorage and localStorage for reliability)
     const urlParams = new URLSearchParams(window.location.search);
@@ -320,14 +288,10 @@ function initializeLoginPage() {
         redirect_uri: MICROSOFT_REDIRECT_URI,
         code_verifier: codeVerifier
       };
-      const API_BASE = getApiBase();
-      const CALLBACK_URL = `${API_BASE}/auth/microsoft/callback`;
 
-      const response = await fetch(CALLBACK_URL, {
+      // ✅ Session cookie sent automatically via proxy
+      const response = await apiFetch('/auth/microsoft/callback', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify(requestBody)
       });
 
@@ -337,22 +301,17 @@ function initializeLoginPage() {
         sessionStorage.removeItem('code_verifier');
         sessionStorage.removeItem('login_in_progress');
         
-        // Calculate and store token expiration
-        const expiresIn = data.expires_in || 3600; // Default 1 hour
-        const expiresAt = Date.now() + (expiresIn * 1000);
-        
+        // ✅ Session-based auth - backend sets session_id cookie automatically
+        // Store ONLY UI info (id, name, email) - NO tokens
         const user = {
           id: data.user_id,
           name: data.name,
-          email: data.email,
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-          token_expires_at: expiresAt,      // Phase 2.1: Token expiration tracking
-          token_issued_at: Date.now()       // Phase 2.1: Token issued timestamp
+          email: data.email
         };
         
         localStorage.setItem('user', JSON.stringify(user));
-        console.log('[AUTH] Token expires in', Math.round(expiresIn / 60), 'minutes');
+        console.log('[AUTH] ✅ Session created - session_id cookie set by backend');
+        console.log('[AUTH] User info stored:', { id: user.id, email: user.email });
         
         // Get redirect URL from sessionStorage (saved before OAuth)
         // Use backup from localStorage if sessionStorage is empty
@@ -454,12 +413,14 @@ function initializeLoginPage() {
   loadOAuthConfig().then(() => {
     console.log('Login page initialized');
     console.log('Current hostname:', window.location.hostname);
-    console.log('API Base URL:', getApiBase());
     
+    // ✅ FIX 3: Check OAuth callback FIRST, then auth status (prevents race condition)
     const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
     const error = urlParams.get('error');
     const email = urlParams.get('email');
     
+    // Handle error messages from URL params
     if (error === 'unauthorized_domain') {
       const errorMessage = `⚠️ Access Denied\n\nOnly CloudFuze company accounts (@cloudfuze.com) are allowed to access this application.\n\n${email ? `Your email: ${decodeURIComponent(email)}` : ''}\n\nPlease log in with your CloudFuze account.`;
       showError(errorMessage.replace(/\n/g, '<br>'));
@@ -480,31 +441,20 @@ function initializeLoginPage() {
       console.error('Microsoft login button not found');
     }
     
-    checkAuthStatus();
-    handleOAuthCallback();
-  });
-
-  // Check authentication status when page becomes visible
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) {
-      console.log('Page became visible, checking auth status...');
-      resetLoginButton();
-      checkAuthStatus();
+    // ✅ Check OAuth callback FIRST, then session (prevents race condition)
+    if (code) {
+      // OAuth callback in progress - handle it first
+      console.log('[AUTH] OAuth callback detected, handling first...');
+      handleOAuthCallback();
+    } else {
+      // No OAuth callback - check existing session
+      console.log('[AUTH] No OAuth callback, checking existing session...');
+      checkSessionStatus();
     }
   });
 
-  // Also check when the page is focused
-  window.addEventListener('focus', function() {
-    console.log('Window focused, checking auth status...');
-    resetLoginButton();
-    checkAuthStatus();
-  });
-
-  // Check authentication on page load
-  window.addEventListener('load', function() {
-    console.log('Page loaded, checking auth status...');
-    resetLoginButton();
-    checkAuthStatus();
-  });
+  // ❌ REMOVED: Multiple auth checks on focus/visibility cause race conditions
+  // Auth check is already handled in loadOAuthConfig().then() above
+  // No need for duplicate checks on focus/load events
 }
 

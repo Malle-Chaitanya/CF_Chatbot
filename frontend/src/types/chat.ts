@@ -4,10 +4,9 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  access_token: string;
-  refresh_token: string;
-  token_expires_at?: number;  // Timestamp when token expires (milliseconds)
-  token_issued_at?: number;   // Timestamp when token was issued (milliseconds)
+  // ✅ FIX 2: Removed token fields - session-based auth uses httpOnly cookies
+  // access_token, refresh_token, token_expires_at removed
+  // Session is managed by backend via session_id cookie
 }
 
 export interface Message {

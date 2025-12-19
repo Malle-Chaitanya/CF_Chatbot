@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from fastapi import APIRouter, Request, HTTPException, Header, Depends, Query
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi import APIRouter, Request, HTTPException, Header, Depends, Query, status
+from fastapi.responses import PlainTextResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import uuid
@@ -10,7 +10,11 @@ import json
 import base64
 import asyncio
 import re
+import logging
 from datetime import datetime
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 from app.llm import setup_qa_chain
 from app.llm_factory import get_llm
@@ -489,120 +493,149 @@ def decode_unsafe_jwt(token: str) -> Optional[dict]:
         print(f"[AUTH] Failed to decode token locally: {e}")
         return None
 
-async def require_auth(authorization: Optional[str] = Header(None)) -> dict:
+async def require_auth(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+) -> dict:
     """
-    Verify user is authenticated with a valid Microsoft access token.
+    ✅ NEW: Session-based authentication (no Graph API calls on every request).
+    
+    Priority:
+    1. Session cookie (preferred - no Graph API call)
+    2. Bearer token (legacy fallback - calls Graph API)
+    
     Can be disabled for testing by setting DISABLE_AUTH_FOR_TESTING=true in .env
     """
-    # Check if auth is disabled for testing
     import os
+    
+    # Check if auth is disabled for testing
     if os.getenv("DISABLE_AUTH_FOR_TESTING", "false").lower() == "true":
-        print("[AUTH] Authentication DISABLED for testing")
+        logger.info("[AUTH] Authentication DISABLED for testing")
         return {
             "user_id": "test_user",
             "name": "Test User",
             "email": "test@example.com"
         }
     
-    # Normal authentication flow
-    if not authorization or not authorization.startswith("Bearer "):
+    # ✅ FIX 1: Always define session_id first (prevents UnboundLocalError)
+    session_id = request.cookies.get("session_id")
+    
+    # PRIORITY 1: Try session-based auth (no Graph API call)
+    if session_id:
+        try:
+            from app.session_store import session_store
+            await session_store.connect()
+            
+            session = await session_store.get_session(session_id)
+            
+            if session:
+                # Check if token needs refresh (non-blocking check)
+                token_expires_at = session.get("token_expires_at")
+                if token_expires_at and isinstance(token_expires_at, datetime):
+                    from datetime import timedelta
+                    now = datetime.utcnow()
+                    margin = timedelta(minutes=5)
+                    
+                    if token_expires_at - now < margin:
+                        # Token expiring soon - log for background refresh
+                        logger.info(f"[AUTH] Token expiring soon for session {session_id[:8]}... (will refresh on next request)")
+                
+                logger.debug(f"[AUTH] User authenticated via session: {session['user_email']}")
+                return {
+                    "user_id": session["user_id"],
+                    "email": session["user_email"],
+                    "name": session["user_name"]
+                }
+        except Exception as e:
+            logger.warning(f"[AUTH] Session validation failed: {e}, falling back to token auth")
+    
+    # ✅ FIX: If no session, return proper 401 (not crash)
+    if not session_id:
+        logger.debug("[AUTH] No session_id cookie found")
         raise HTTPException(
             status_code=401,
-            detail="Unauthorized: Missing or invalid authorization header. Please log in."
+            detail="Unauthorized: No active session. Please log in."
         )
     
-    access_token = authorization.replace("Bearer ", "")
-    
-    # --- FALLBACK: Try to verify with Graph API, fall back to local decoding on failure ---
-    try:
-        # Verify token with Microsoft Graph API with retries
-        max_retries = 3
-        retry_delay = 1.0
+    # PRIORITY 2: Fallback to token-based auth (legacy - for backward compatibility during migration)
+    # ⚠️ NOTE: This is temporary - remove once all clients use sessions
+    if authorization and authorization.startswith("Bearer "):
+        logger.warning("[AUTH] Using legacy token-based auth (should migrate to sessions)")
+        access_token = authorization.replace("Bearer ", "")
         
-        async with httpx.AsyncClient() as client:
-            for attempt in range(max_retries):
-                try:
-                    graph_response = await client.get(
-                        "https://graph.microsoft.com/v1.0/me",
-                        headers={"Authorization": f"Bearer {access_token}"},
-                        timeout=15.0
-                    )
-                    
-                    if graph_response.status_code == 200:
-                        # SUCCESS: Token is valid and verified by Graph
-                        user_info = graph_response.json()
-                        user_email = user_info.get("mail") or user_info.get("userPrincipalName", "")
+        # Verify token with Microsoft Graph API (ONLY as fallback)
+        try:
+            max_retries = 3
+            retry_delay = 1.0
+            
+            async with httpx.AsyncClient() as client:
+                for attempt in range(max_retries):
+                    try:
+                        graph_response = await client.get(
+                            "https://graph.microsoft.com/v1.0/me",
+                            headers={"Authorization": f"Bearer {access_token}"},
+                            timeout=15.0
+                        )
                         
-                        # Validate CloudFuze email domain
-                        if not user_email.endswith("@cloudfuze.com"):
-                            print(f"[AUTH] Access denied for non-CloudFuze email: {user_email}")
-                            raise HTTPException(
-                                status_code=403,
-                                detail="Forbidden: Only CloudFuze company accounts are allowed to access this application."
-                            )
+                        if graph_response.status_code == 200:
+                            user_info = graph_response.json()
+                            user_email = user_info.get("mail") or user_info.get("userPrincipalName", "")
+                            
+                            if not user_email.endswith("@cloudfuze.com"):
+                                raise HTTPException(
+                                    status_code=403,
+                                    detail="Forbidden: Only CloudFuze company accounts are allowed."
+                                )
+                            
+                            logger.info(f"[AUTH] User authenticated via token (legacy): {user_email}")
+                            return {
+                                "user_id": user_info.get("id"),
+                                "email": user_email,
+                                "name": user_info.get("displayName", "User")
+                            }
                         
-                        print(f"[AUTH] User authenticated via Graph: {user_email}")
-                        return {
-                            "user_id": user_info.get("id"),
-                            "email": user_email,
-                            "name": user_info.get("displayName", "User")
-                        }
+                        if graph_response.status_code == 401:
+                            break  # Token invalid, don't retry
                         
-                    # If 401, token is rejected by Graph. In DEV, this might be due to audience mismatch.
-                    # Fall through to local decoding fallback below.
-                    if graph_response.status_code == 401:
-                        print(f"[AUTH] Graph API rejected token (401). Attempting local fallback...")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delay)
+                            continue
+                            
+                    except httpx.HTTPError as e:
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delay)
+                            continue
                         break
-                        
-                    # Other errors (5xx, etc), retry
-                    if attempt < max_retries - 1:
-                        print(f"[AUTH] Verification attempt {attempt+1} failed ({graph_response.status_code}), retrying...")
-                        await asyncio.sleep(retry_delay)
-                        continue
-                        
-                except httpx.HTTPError as e:
-                    # Network error, retry
-                    if attempt < max_retries - 1:
-                        print(f"[AUTH] Network error on attempt {attempt+1}: {str(e)}, retrying...")
-                        await asyncio.sleep(retry_delay)
-                        continue
-                    else:
-                        print(f"[AUTH] Network error finalized: {str(e)}")
-                        break
-
-    except Exception as e:
-        print(f"[AUTH] Unexpected error during Graph verification: {e}")
-        # Fall through to fallback
+        except Exception as e:
+            logger.error(f"[AUTH] Token verification error: {e}")
         
-    # --- FALLBACK: Local Token Decoding (Unsafe/Dev Mode) ---
-    # If we reached here, Graph verification failed (401, network error, etc.)
-    # Try to extract user info from the token itself if it looks valid.
-    
-    print("[AUTH] Attempting local token decoding fallback...")
-    claims = decode_unsafe_jwt(access_token)
-    
-    if claims:
-        # Extract email/upn
-        user_email = claims.get("email") or claims.get("upn") or claims.get("unique_name")
-        user_name = claims.get("name") or claims.get("given_name") or "User"
-        user_id = claims.get("oid") or claims.get("sub")
+        # ❌ REMOVED: Unsafe JWT decoding fallback (security risk in production)
+        # This was causing inconsistent auth behavior
+        # Production should NEVER use unsafe token decoding
+        is_development = os.getenv("ENVIRONMENT", "production").lower() == "development"
         
-        if user_email and user_email.endswith("@cloudfuze.com"):
-            print(f"[AUTH] ⚠️ FALLBACK: User authenticated via local token decoding: {user_email}")
-            return {
-                "user_id": user_id or user_email, # Use email as ID if oid missing
-                "email": user_email,
-                "name": user_name
-            }
-        else:
-            print(f"[AUTH] Fallback failed: Invalid email domain or missing email in token: {user_email}")
-    else:
-        print("[AUTH] Fallback failed: Could not decode token")
-
+        if is_development:
+            # Only allow unsafe decoding in development
+            logger.warning("[AUTH] Development mode: Attempting unsafe JWT decoding (NOT for production)")
+            claims = decode_unsafe_jwt(access_token)
+            
+            if claims:
+                user_email = claims.get("email") or claims.get("upn") or claims.get("unique_name")
+                user_name = claims.get("name") or claims.get("given_name") or "User"
+                user_id = claims.get("oid") or claims.get("sub")
+                
+                if user_email and user_email.endswith("@cloudfuze.com"):
+                    logger.warning(f"[AUTH] ⚠️ DEV FALLBACK: User authenticated via unsafe JWT: {user_email}")
+                    return {
+                        "user_id": user_id or user_email,
+                        "email": user_email,
+                        "name": user_name
+                    }
+    
     # If all fails, raise 401
     raise HTTPException(
         status_code=401,
-        detail="Unauthorized: Unable to verify access token. Please log in again."
+        detail="Unauthorized: No valid session or token. Please log in again."
     )
 
 # File path for corrected responses
@@ -4391,81 +4424,254 @@ async def test_post_endpoint(data: dict):
     return {"message": "POST request received", "data": data, "status": "success"}
 
 @router.post("/auth/microsoft/refresh")
-async def refresh_microsoft_token(request: TokenRefreshRequest):
+async def refresh_microsoft_token(
+    request: Request,
+    refresh_request: Optional[TokenRefreshRequest] = None,
+    session_id: Optional[str] = None
+):
     """
-    Refresh Microsoft OAuth access token using refresh token.
+    ✅ NEW: Refresh Microsoft OAuth tokens using session (preferred) or refresh_token (legacy).
+    
+    Priority:
+    1. Session-based refresh (preferred - uses session_id from cookie)
+    2. Refresh token (legacy - for backward compatibility)
     
     SECURITY: Backend owns all OAuth credentials.
-    Frontend only provides the refresh_token.
     """
-    try:
-        # Backend owns these secrets
-        tenant = MICROSOFT_TENANT
-        client_id = MICROSOFT_CLIENT_ID
-        client_secret = MICROSOFT_CLIENT_SECRET
-        
-        token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
-        
-        token_data = {
-            "client_id": client_id,
-            "client_secret": client_secret,  # Never exposed to frontend
-            "refresh_token": request.refresh_token,
-            "grant_type": "refresh_token",
-            "scope": "openid email profile User.Read"
-        }
-        
-        async with httpx.AsyncClient() as client:
-            token_response = await client.post(token_url, data=token_data, timeout=30.0)
+    from app.session_store import session_store
+    
+    # PRIORITY 1: Session-based refresh (no refresh_token needed)
+    if not session_id:
+        session_id = request.cookies.get("session_id")
+    
+    if session_id:
+        try:
+            await session_store.connect()
+            session = await session_store.get_session(session_id)
             
-            if token_response.status_code != 200:
-                logger.error(f"Token refresh failed: {token_response.status_code}")
-                # Log but don't expose full error details to frontend
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token refresh failed"
-                )
-            
-            token_info = token_response.json()
-            
-            # Validate CloudFuze domain again (defense in depth)
-            async with httpx.AsyncClient() as graph_client:
-                user_response = await graph_client.get(
-                    "https://graph.microsoft.com/v1.0/me",
-                    headers={"Authorization": f"Bearer {token_info.get('access_token')}"},
-                    timeout=10.0
-                )
+            if session:
+                # Use refresh_token from session
+                refresh_token = session.get("refresh_token")
                 
-                if user_response.status_code == 200:
-                    user_info = user_response.json()
-                    user_email = user_info.get("mail") or user_info.get("userPrincipalName", "")
+                if refresh_token:
+                    # Refresh tokens via Microsoft
+                    tenant = MICROSOFT_TENANT
+                    client_id = MICROSOFT_CLIENT_ID
+                    client_secret = MICROSOFT_CLIENT_SECRET
                     
-                    if not user_email.endswith("@cloudfuze.com"):
-                        logger.warning(f"Refresh attempt from non-CloudFuze email: {user_email}")
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Access denied"
+                    token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+                    
+                    token_data = {
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "refresh_token": refresh_token,
+                        "grant_type": "refresh_token",
+                        "scope": "openid email profile User.Read"
+                    }
+                    
+                    async with httpx.AsyncClient() as client:
+                        token_response = await client.post(token_url, data=token_data, timeout=30.0)
+                        
+                        if token_response.status_code != 200:
+                            logger.error(f"Token refresh failed for session: {token_response.status_code}")
+                            raise HTTPException(
+                                status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Token refresh failed"
+                            )
+                        
+                        token_info = token_response.json()
+                        
+                        # Update session with new tokens
+                        await session_store.refresh_session_tokens(
+                            session_id=session_id,
+                            new_access_token=token_info.get("access_token"),
+                            new_refresh_token=token_info.get("refresh_token", refresh_token),
+                            token_expires_in=token_info.get("expires_in", 3600)
                         )
+                        
+                        logger.info(f"[AUTH] Session tokens refreshed: {session_id[:8]}...")
+                        
+                        return {
+                            "access_token": token_info.get("access_token"),  # For backward compatibility
+                            "refresh_token": token_info.get("refresh_token"),  # For backward compatibility
+                            "expires_in": token_info.get("expires_in", 3600),
+                            "token_type": token_info.get("token_type", "Bearer"),
+                            "session_id": session_id  # Return session_id for frontend
+                        }
+        except Exception as e:
+            logger.error(f"[AUTH] Session-based refresh failed: {e}")
+            # Fall through to legacy refresh
+    
+    # PRIORITY 2: Legacy refresh using refresh_token (for backward compatibility)
+    if refresh_request and refresh_request.refresh_token:
+        logger.warning("[AUTH] Using legacy refresh_token-based refresh")
+        try:
+            tenant = MICROSOFT_TENANT
+            client_id = MICROSOFT_CLIENT_ID
+            client_secret = MICROSOFT_CLIENT_SECRET
             
-            logger.info(f"Token refreshed successfully")
+            token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
             
-            return {
-                "access_token": token_info.get("access_token"),
-                "refresh_token": token_info.get("refresh_token"),
-                "expires_in": token_info.get("expires_in", 3600),
-                "token_type": token_info.get("token_type", "Bearer")
+            token_data = {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": refresh_request.refresh_token,
+                "grant_type": "refresh_token",
+                "scope": "openid email profile User.Read"
             }
             
+            async with httpx.AsyncClient() as client:
+                token_response = await client.post(token_url, data=token_data, timeout=30.0)
+                
+                if token_response.status_code != 200:
+                    logger.error(f"Token refresh failed: {token_response.status_code}")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token refresh failed"
+                    )
+                
+                token_info = token_response.json()
+                
+                logger.info(f"Token refreshed successfully (legacy)")
+                
+                return {
+                    "access_token": token_info.get("access_token"),
+                    "refresh_token": token_info.get("refresh_token"),
+                    "expires_in": token_info.get("expires_in", 3600),
+                    "token_type": token_info.get("token_type", "Bearer")
+                }
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Token refresh error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Token refresh failed"
+            )
+    
+    # No valid session or refresh_token
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Unauthorized: No valid session or refresh token"
+    )
+
+
+@router.post("/auth/session/refresh")
+async def refresh_session(request: Request):
+    """
+    ✅ NEW: Refresh session tokens automatically (called by frontend token monitor).
+    Uses session_id from cookie - no parameters needed.
+    """
+    from app.session_store import session_store
+    
+    session_id = request.cookies.get("session_id")
+    
+    if not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No session found"
+        )
+    
+    try:
+        await session_store.connect()
+        session = await session_store.get_session(session_id)
+        
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired or invalid"
+            )
+        
+        # Check if token needs refresh
+        token_expires_at = session.get("token_expires_at")
+        if token_expires_at and isinstance(token_expires_at, datetime):
+            from datetime import timedelta
+            now = datetime.utcnow()
+            margin = timedelta(minutes=5)
+            
+            if token_expires_at - now < margin:
+                # Refresh tokens
+                refresh_token = session.get("refresh_token")
+                
+                tenant = MICROSOFT_TENANT
+                client_id = MICROSOFT_CLIENT_ID
+                client_secret = MICROSOFT_CLIENT_SECRET
+                
+                token_url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+                
+                token_data = {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "refresh_token": refresh_token,
+                    "grant_type": "refresh_token",
+                    "scope": "openid email profile User.Read"
+                }
+                
+                async with httpx.AsyncClient() as client:
+                    token_response = await client.post(token_url, data=token_data, timeout=30.0)
+                    
+                    if token_response.status_code == 200:
+                        token_info = token_response.json()
+                        
+                        # Update session
+                        await session_store.refresh_session_tokens(
+                            session_id=session_id,
+                            new_access_token=token_info.get("access_token"),
+                            new_refresh_token=token_info.get("refresh_token", refresh_token),
+                            token_expires_in=token_info.get("expires_in", 3600)
+                        )
+                        
+                        logger.info(f"[AUTH] Session tokens refreshed automatically: {session_id[:8]}...")
+                        
+                        return {
+                            "success": True,
+                            "expires_in": token_info.get("expires_in", 3600)
+                        }
+        
+        # Token still valid, no refresh needed
+        return {
+            "success": True,
+            "message": "Token still valid"
+        }
+        
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Token refresh error: {e}")
+        logger.error(f"[AUTH] Session refresh error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token refresh failed"
+            detail="Session refresh failed"
         )
 
+
+@router.post("/auth/logout")
+async def logout(request: Request):
+    """
+    ✅ NEW: Logout endpoint - deletes session.
+    """
+    from app.session_store import session_store
+    
+    session_id = request.cookies.get("session_id")
+    
+    if session_id:
+        try:
+            await session_store.connect()
+            await session_store.delete_session(session_id)
+            logger.info(f"[AUTH] User logged out: {session_id[:8]}...")
+        except Exception as e:
+            logger.error(f"[AUTH] Logout error: {e}")
+    
+    # Clear session cookie
+    response = JSONResponse(content={"success": True, "message": "Logged out successfully"})
+    response.delete_cookie(key="session_id")
+    
+    return response
+
 @router.post("/auth/microsoft/callback")
-async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
+async def microsoft_oauth_callback(
+    request: MicrosoftCallbackRequest,
+    http_request: Request
+):
     """Handle Microsoft OAuth callback and exchange code for tokens."""
     try:
         # Get Microsoft OAuth configuration
@@ -4521,18 +4727,98 @@ async def microsoft_oauth_callback(request: MicrosoftCallbackRequest):
                     "details": f"Email domain not allowed: {user_email}"
                 }
             
+            # ✅ NEW: Create backend session (Graph API called ONLY here)
+            from app.session_store import session_store
+            await session_store.connect()
+            
+            session_id = await session_store.create_session(
+                user_id=user_id,
+                user_email=user_email,
+                user_name=user_name,
+                access_token=access_token,
+                refresh_token=token_info.get("refresh_token", ""),
+                token_expires_in=token_info.get("expires_in", 3600)
+            )
+            
+            logger.info(f"[AUTH] Created session for user: {user_email} (session_id: {session_id[:8]}...)")
+            
+            # 🔥 CRITICAL FIX: Create Response object FIRST, then set cookie on it
+            from app.session_store import SESSION_EXPIRY_HOURS
+            import os
+            
+            # ✅ Cookie settings: Different for dev vs production
+            # Development (localhost): SameSite=lax, secure=False (works with Next.js proxy)
+            # Production (HTTPS): SameSite=None, secure=True (cross-origin)
+            
+            # Use http_request (FastAPI Request) to get URL, not request (Pydantic model)
+            request_url = str(http_request.url)
+            is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
+            is_https = request_url.startswith("https://")
+            is_localhost = "localhost" in request_url or "127.0.0.1" in request_url
+            
+            # Determine cookie settings
+            # ✅ PRODUCTION READY: Automatically detects environment and sets correct cookie flags
+            if is_production and is_https:
+                # Production HTTPS: Check if using proxy (same-origin) or direct (cross-origin)
+                # If frontend uses Next.js proxy, requests are same-origin → SameSite=Lax
+                # If frontend calls backend directly on different domain → SameSite=None
+                # Default to Lax (works with proxy), can be overridden via env var if needed
+                use_cross_origin = os.getenv("USE_CROSS_ORIGIN_COOKIES", "false").lower() == "true"
+                secure_cookie = True
+                samesite_setting = "none" if use_cross_origin else "lax"  # Lax for proxy, None for direct
+            else:
+                # Development or HTTP: Same-origin cookies (via proxy)
+                secure_cookie = False
+                samesite_setting = "lax"  # Works with same-origin
+            
+            # 🔥 CRITICAL: Create JSONResponse FIRST, then set cookie on it
+            # ✅ Return only user info (no tokens - session managed via cookie)
             result = {
                 "user_id": user_id,
                 "name": user_name,
-                "email": user_email,
-                "access_token": access_token,
-                "refresh_token": token_info.get("refresh_token", ""),
-                "expires_in": token_info.get("expires_in", 3600)  # Token lifetime in seconds
+                "email": user_email
             }
             
-            return result
+            response = JSONResponse(content=result)
+            
+            # 🔥 CRITICAL: Set cookie using FastAPI's set_cookie() method
+            response.set_cookie(
+                key="session_id",
+                value=session_id,
+                max_age=3600 * SESSION_EXPIRY_HOURS,  # Cookie expires with session (3600 seconds = 1 hour)
+                httponly=True,  # Prevent XSS attacks
+                secure=secure_cookie,  # False in dev, True in production HTTPS
+                samesite=samesite_setting,  # "lax" in dev, "none" in production
+                path="/",  # Explicit path to ensure cookie is sent
+                domain=None  # Don't set domain - let browser use current domain
+            )
+            
+            # 🔥 FALLBACK: Manually set Set-Cookie header to ensure it's sent
+            # This is a workaround in case FastAPI's set_cookie() doesn't work properly
+            # Construct the Set-Cookie header manually
+            max_age_seconds = 3600 * SESSION_EXPIRY_HOURS  # 3600 seconds = 1 hour
+            set_cookie_parts = [
+                f"session_id={session_id}",
+                f"Path=/",
+                f"Max-Age={max_age_seconds}",
+                "HttpOnly",
+            ]
+            if secure_cookie:
+                set_cookie_parts.append("Secure")
+            if samesite_setting:
+                set_cookie_parts.append(f"SameSite={samesite_setting}")
+            
+            set_cookie_header = "; ".join(set_cookie_parts)
+            response.headers["Set-Cookie"] = set_cookie_header
+            
+            logger.info(f"[AUTH] ✅ Session cookie configured: secure={secure_cookie}, httponly=True, samesite={samesite_setting}, path=/")
+            logger.info(f"[AUTH] ✅ Set-Cookie header manually set: {set_cookie_header[:80]}...")
+            logger.info(f"[AUTH] ✅ Session created for user: {user_email} (session_id: {session_id[:8]}...)")
+            
+            return response
             
     except Exception as e:
+        logger.error(f"[AUTH] ❌ OAuth callback exception: {str(e)}", exc_info=True)
         return {"error": f"OAuth callback failed: {str(e)}"}
 
 
