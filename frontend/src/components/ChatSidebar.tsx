@@ -454,8 +454,13 @@ export default function ChatSidebar({
     } catch (error) {
       console.error('[AUTH] Logout error:', error);
     } finally {
-      // Always clear local data and redirect
+      // Always clear local data
       localStorage.removeItem('user');
+      // 🔒 CRITICAL: Clear session expiration flag on manual logout
+      // This prevents showing "session expired" error when user manually logs out
+      sessionStorage.removeItem('session_expired');
+      // Set manual logout flag to prevent error message
+      sessionStorage.setItem('manual_logout', 'true');
       router.replace('/login');
     }
   };

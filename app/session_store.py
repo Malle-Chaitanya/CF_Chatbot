@@ -11,7 +11,8 @@ This solves the "random expiration" issue by:
 3. Validating sessions from MongoDB on every request (no Graph API calls)
 4. Refreshing tokens in the background without user interruption
 """
-
+import os
+from dotenv import load_dotenv
 import os
 import logging
 from datetime import datetime, timedelta
@@ -21,6 +22,7 @@ from bson import ObjectId
 import secrets
 import hashlib
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 # MongoDB connection
@@ -28,7 +30,7 @@ _mongodb_client: Optional[AsyncIOMotorClient] = None
 _mongodb_database: Optional[AsyncIOMotorDatabase] = None
 
 # Session configuration
-SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", "24"))  # 24 hours default
+SESSION_EXPIRY_HOURS = int(os.getenv("SESSION_EXPIRY_HOURS", "8"))  # 8 hours default
 SESSION_COLLECTION = "app_sessions"
 TOKEN_REFRESH_MARGIN_MINUTES = 5  # Refresh token 5 minutes before expiration
 

@@ -1,17 +1,36 @@
 /**
  * Next.js API Proxy Route
  * 
- * ✅ This proxy route is used for ALL backend API calls to ensure:
+ * ✅ This proxy route is used for backend API calls in DEVELOPMENT ONLY:
  * - Same-origin requests (no CORS issues)
  * - Cookies are automatically forwarded
- * - Consistent cookie handling across dev and prod
+ * - Helps with localhost cookie handling
  * 
- * All frontend API calls should use `/api/proxy/*` paths via the `apiFetch()` helper.
+ * 🔒 SECURITY: This proxy is HARD-DISABLED in production for security.
+ * In production, use direct API calls with proper CORS/reverse proxy setup.
+ * 
+ * All frontend API calls should use the `apiFetch()` helper which handles
+ * proxy vs direct routing automatically.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 // ⚠️ CRITICAL: Use axios with proper configuration to access Set-Cookie headers
 import axios from 'axios';
+
+// 🔒 SECURITY: Hard-disable proxy in production
+// This prevents any proxy access even if route is accidentally called
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Helper function to return production block response
+function productionBlockResponse() {
+  return NextResponse.json(
+    { 
+      error: 'Proxy disabled in production',
+      message: 'This proxy route is only available in development. Use direct API calls in production.'
+    },
+    { status: 403 }
+  );
+}
 
 // Get backend URL from environment or default to localhost
 // ⚠️ CRITICAL: Must use 'localhost' (not 127.0.0.1) for cookie domain matching
@@ -148,11 +167,17 @@ async function proxyRequest(
       // Don't crash - just log the error and continue
     }
     
-    // Forward other important headers (except content-type and set-cookie which we handled above)
+    // Forward other important headers (except content-type, set-cookie, and content-length which we handled above)
+    // 🔒 CRITICAL FIX: Remove content-length to prevent ERR_CONTENT_LENGTH_MISMATCH
+    // Next.js will calculate the correct content-length automatically
     try {
       Object.entries(axiosResponse.headers).forEach(([key, value]) => {
         const lowerKey = key.toLowerCase();
-        if (lowerKey !== 'set-cookie' && lowerKey !== 'content-type') {
+        // Skip headers that Next.js handles automatically or we've already handled
+        if (lowerKey !== 'set-cookie' && 
+            lowerKey !== 'content-type' && 
+            lowerKey !== 'content-length' &&  // 🔒 CRITICAL: Remove to prevent mismatch
+            lowerKey !== 'transfer-encoding') {  // Also skip transfer-encoding
           const headerValue = Array.isArray(value) ? value.join(', ') : String(value);
           proxiedResponse.headers.set(key, headerValue);
         }
@@ -182,6 +207,10 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> | { path: string[] } }
 ) {
+  // 🔒 SECURITY: Block proxy in production
+  if (isProduction) {
+    return productionBlockResponse();
+  }
   const params = await Promise.resolve(context.params);
   return proxyRequest(request, params.path, 'GET');
 }
@@ -190,6 +219,10 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> | { path: string[] } }
 ) {
+  // 🔒 SECURITY: Block proxy in production
+  if (isProduction) {
+    return productionBlockResponse();
+  }
   const params = await Promise.resolve(context.params);
   return proxyRequest(request, params.path, 'POST');
 }
@@ -198,6 +231,10 @@ export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> | { path: string[] } }
 ) {
+  // 🔒 SECURITY: Block proxy in production
+  if (isProduction) {
+    return productionBlockResponse();
+  }
   const params = await Promise.resolve(context.params);
   return proxyRequest(request, params.path, 'PUT');
 }
@@ -206,6 +243,10 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> | { path: string[] } }
 ) {
+  // 🔒 SECURITY: Block proxy in production
+  if (isProduction) {
+    return productionBlockResponse();
+  }
   const params = await Promise.resolve(context.params);
   return proxyRequest(request, params.path, 'DELETE');
 }
@@ -214,6 +255,10 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> | { path: string[] } }
 ) {
+  // 🔒 SECURITY: Block proxy in production
+  if (isProduction) {
+    return productionBlockResponse();
+  }
   const params = await Promise.resolve(context.params);
   return proxyRequest(request, params.path, 'PATCH');
 }

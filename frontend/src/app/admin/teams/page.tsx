@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getApiBase, getCurrentUser } from '@/lib/session-utils';
+import { getCurrentUser } from '@/lib/session-utils';
+import { getApiBase } from '@/lib/api';
 import { isAdminEmail } from '@/constants/admins';
 import { User } from '@/types/chat';
 import React from 'react';

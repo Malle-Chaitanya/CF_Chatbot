@@ -91,16 +91,39 @@ function initializeLoginPage() {
   async function checkSessionStatus() {
     console.log('[AUTH] Checking session status...');
     
+    // 🔒 CRITICAL: Check if this is a manual logout (don't show error)
+    const isManualLogout = sessionStorage.getItem('manual_logout') === 'true';
+    if (isManualLogout) {
+      // User manually logged out - clear flags and don't show error
+      sessionStorage.removeItem('manual_logout');
+      sessionStorage.removeItem('session_expired');
+      console.log('[AUTH] Manual logout detected - no error message');
+      return; // Don't check session, just stay on login page
+    }
+    
     const isLoggedIn = await checkSession();
     
     if (isLoggedIn) {
       // Session is valid - user is logged in
       console.log('[AUTH] ✅ Session valid, redirecting to main page');
+      // Clear any stored session expiration error
+      sessionStorage.removeItem('session_expired');
+      sessionStorage.removeItem('manual_logout');
       window.location.href = "/";
     } else {
       // Session expired or invalid - stay on login page
       console.log('[AUTH] No valid session');
       localStorage.removeItem('user');
+      
+      // Only show error if it's actually a session expiration (not manual logout)
+      const hasStoredExpiration = sessionStorage.getItem('session_expired') === 'true';
+      if (hasStoredExpiration) {
+        // Set session expiration flag so error persists across refreshes
+        sessionStorage.setItem('session_expired', 'true');
+        // Show persistent error message
+        showError('⚠️ Your session has expired. Please log in again.', true);
+      }
+      // If no stored expiration flag, it might be a fresh page load - don't show error
     }
   }
 
@@ -158,7 +181,7 @@ function initializeLoginPage() {
   }
 
   // Error display function
-  function showError(message: string) {
+  function showError(message: string, persist: boolean = false) {
     const existingError = document.querySelector('.error-message');
     if (existingError) {
       existingError.remove();
@@ -178,11 +201,14 @@ function initializeLoginPage() {
     errorDiv.innerHTML = message;
     document.querySelector('.login-container')!.appendChild(errorDiv);
     
-    setTimeout(() => {
-      if (errorDiv.parentNode) {
-        errorDiv.remove();
-      }
-    }, 5000);
+    // Only auto-dismiss if persist is false
+    if (!persist) {
+      setTimeout(() => {
+        if (errorDiv.parentNode) {
+          errorDiv.remove();
+        }
+      }, 5000);
+    }
   }
 
   // Success display function
@@ -310,6 +336,9 @@ function initializeLoginPage() {
         };
         
         localStorage.setItem('user', JSON.stringify(user));
+        // Clear all session-related flags on successful login
+        sessionStorage.removeItem('session_expired');
+        sessionStorage.removeItem('manual_logout');
         console.log('[AUTH] ✅ Session created - session_id cookie set by backend');
         console.log('[AUTH] User info stored:', { id: user.id, email: user.email });
         
@@ -423,14 +452,22 @@ function initializeLoginPage() {
     // Handle error messages from URL params
     if (error === 'unauthorized_domain') {
       const errorMessage = `⚠️ Access Denied\n\nOnly CloudFuze company accounts (@cloudfuze.com) are allowed to access this application.\n\n${email ? `Your email: ${decodeURIComponent(email)}` : ''}\n\nPlease log in with your CloudFuze account.`;
-      showError(errorMessage.replace(/\n/g, '<br>'));
+      showError(errorMessage.replace(/\n/g, '<br>'), true); // Persist until user logs in
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (error === 'invalid_token' || error === 'session_expired') {
-      showError('⚠️ Your session has expired. Please log in again.');
+      // Store session expiration state so it persists across page refreshes
+      sessionStorage.setItem('session_expired', 'true');
+      showError('⚠️ Your session has expired. Please log in again.', true); // Persist until user logs in
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (error === 'verification_failed') {
-      showError('⚠️ Unable to verify your access. Please log in again.');
+      showError('⚠️ Unable to verify your access. Please log in again.', true); // Persist until user logs in
       window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      // Check for stored session expiration state (for page refreshes)
+      const hasStoredExpiration = sessionStorage.getItem('session_expired') === 'true';
+      if (hasStoredExpiration) {
+        showError('⚠️ Your session has expired. Please log in again.', true);
+      }
     }
     
     const microsoftButton = document.getElementById("microsoftLogin");

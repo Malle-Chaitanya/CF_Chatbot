@@ -101,6 +101,13 @@ export function deleteSession(sessionId: string): void {
     
     // Save to deleted sessions
     const deletedSessions = getDeletedSessions();
+    
+    // 🔒 CRITICAL FIX: Defensive check before unshift
+    if (!Array.isArray(deletedSessions)) {
+      console.error('[SESSION] DeletedSessions is not an array:', deletedSessions);
+      return;
+    }
+    
     deletedSessions.unshift(deletedSession);
     saveDeletedSessions(deletedSessions);
     

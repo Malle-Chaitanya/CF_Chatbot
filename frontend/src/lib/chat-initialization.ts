@@ -2,7 +2,7 @@
 'use client';
 
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
-import type { ChatSession } from '@/types/chat';
+import type { ChatSession, SuggestedQuestion } from '@/types/chat';
 import { fetchAndMergeUserSessions, getCurrentUser } from '@/lib/session-utils';
 import { apiFetch } from '@/lib/api';
 
@@ -466,6 +466,13 @@ export function initializeChatApp(options: InitOptions = {}) {
     }
     
     const sessions = getAllSessions();
+    
+    // 🔒 CRITICAL FIX: Defensive check - ensure sessions is an array
+    if (!Array.isArray(sessions)) {
+      console.error('[SESSION SAVE] Sessions is not an array:', sessions);
+      return; // Cannot save if sessions is not an array
+    }
+    
     const messages = Array.from(messagesDiv!.children)
       .map((child, index) => {
         const isUser = child.classList.contains('user-message-wrapper') || 
@@ -549,6 +556,7 @@ export function initializeChatApp(options: InitOptions = {}) {
     const questionsCount = messages.filter(m => m.role === 'assistant' && 'recommendedQuestions' in m && m.recommendedQuestions).length;
     console.log(`[SESSION SAVE] Saving session with ${messages.length} messages, ${questionsCount} have recommended questions`);
     
+    // Sessions is already validated as array above, safe to use unshift
     if (existingIndex >= 0) {
       sessions[existingIndex] = sessionData;
     } else {
@@ -824,6 +832,13 @@ export function initializeChatApp(options: InitOptions = {}) {
       
       // Save to localStorage
       const sessions = getAllSessions();
+      
+      // 🔒 CRITICAL FIX: Defensive check before unshift
+      if (!Array.isArray(sessions)) {
+        console.error('[SESSION] Sessions is not an array:', sessions);
+        return;
+      }
+      
       sessions.unshift(newSession);
       
       // Keep only last 50 sessions
@@ -896,7 +911,7 @@ export function initializeChatApp(options: InitOptions = {}) {
       if (!user) {
         showToast('Authentication required to share chat', 'error', 3000);
         console.warn('[SHARE] User not authenticated');
-        window.location.href = '/login';
+        window.location.href = '/login?error=session_expired';
         return;
       }
       
@@ -2245,7 +2260,7 @@ export function initializeChatApp(options: InitOptions = {}) {
       if (!currentUser) {
         console.error("[CHAT] User not authenticated, redirecting to login");
         localStorage.removeItem('user');
-        window.location.href = "/login";
+        window.location.href = "/login?error=session_expired";
         return;
       }
       
@@ -2266,7 +2281,7 @@ export function initializeChatApp(options: InitOptions = {}) {
       if (response.status === 401 || response.status === 403) {
         console.error("[CHAT] Authentication failed, redirecting to login");
         localStorage.removeItem('user');
-        window.location.href = "/login";
+        window.location.href = "/login?error=session_expired";
         return;
       }
       
@@ -3226,12 +3241,6 @@ export function initializeChatApp(options: InitOptions = {}) {
   // DYNAMIC SUGGESTED QUESTIONS SYSTEM
   // ============================================================================
   
-  // Type for suggested questions
-  interface SuggestedQuestion {
-    id: string;
-    question_text: string;
-  }
-  
   // Fetch suggested questions from API
   async function loadSuggestedQuestions() {
     try {
@@ -3258,7 +3267,40 @@ export function initializeChatApp(options: InitOptions = {}) {
         return;
       }
       
-      const questions = await response.json();
+      // 🔒 CRITICAL FIX: Defensive check for response data with type guards
+      let questions: SuggestedQuestion[] = [];
+      try {
+        const data = await response.json();
+        
+        // Type guard function to validate SuggestedQuestion
+        const isValidQuestion = (q: any): q is SuggestedQuestion => 
+          q && 
+          typeof q === 'object' && 
+          typeof q.id === 'string' && 
+          typeof q.question_text === 'string';
+        
+        // Backend returns array directly (from MongoDB via QuestionResponse)
+        if (Array.isArray(data)) {
+          // Filter and validate each item (backend may include extra fields like category, priority)
+          questions = data.filter(isValidQuestion);
+        } else if (data && typeof data === 'object') {
+          // Fallback: try to extract from object (shouldn't happen, but defensive)
+          const questionsData = data.questions || data.data || [];
+          if (Array.isArray(questionsData)) {
+            questions = questionsData.filter(isValidQuestion);
+          }
+        }
+      } catch (parseError) {
+        console.error('[QUESTIONS] Failed to parse response:', parseError);
+        return;
+      }
+      
+      // Final safety check
+      if (!Array.isArray(questions)) {
+        console.warn('[QUESTIONS] Questions is not an array:', questions);
+        questions = [];
+      }
+      
       console.log('[QUESTIONS] Loaded', questions.length, 'questions');
       updateSuggestedQuestions(questions);
     } catch (error) {
@@ -3695,8 +3737,13 @@ export function initializeChatApp(options: InitOptions = {}) {
     } catch (error) {
       console.error('[AUTH] Logout error:', error);
     } finally {
-      // Always clear local data and redirect
+      // Always clear local data
       localStorage.removeItem('user');
+      // 🔒 CRITICAL: Clear session expiration flag on manual logout
+      // This prevents showing "session expired" error when user manually logs out
+      sessionStorage.removeItem('session_expired');
+      // Set manual logout flag to prevent error message
+      sessionStorage.setItem('manual_logout', 'true');
       window.location.href = "/login";
     }
   }
