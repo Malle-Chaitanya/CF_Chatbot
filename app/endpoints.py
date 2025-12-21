@@ -4442,6 +4442,14 @@ async def get_auth_config():
         "tenant": MICROSOFT_TENANT
     }
 
+@router.get("/api/proxy/auth/config")
+async def get_auth_config_proxy():
+    """Get OAuth configuration for frontend (proxy path)."""
+    return {
+        "client_id": MICROSOFT_CLIENT_ID,
+        "tenant": MICROSOFT_TENANT
+    }
+
 @router.post("/test-post")
 async def test_post_endpoint(data: dict):
     """Test POST endpoint to verify CORS and connectivity."""
