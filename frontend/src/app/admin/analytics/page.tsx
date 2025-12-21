@@ -90,10 +90,6 @@ export default function AdminLangfuseAnalyticsPage() {
           'Content-Type': 'application/json',
         };
 
-        if (user.access_token) {
-          headers['Authorization'] = `Bearer ${user.access_token}`;
-        }
-
         const fetchOptions = {
           headers,
           credentials: 'include' as const,

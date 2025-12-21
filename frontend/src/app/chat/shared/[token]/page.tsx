@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { getCurrentUser, verifyToken } from '@/lib/session-utils';
+import { getCurrentUser, checkSession } from '@/lib/session-utils';
+import { apiFetch } from '@/lib/api';
 
 export default function SharedChatPage() {
   const router = useRouter();
@@ -13,11 +14,6 @@ export default function SharedChatPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
   const authCheckRef = useRef<boolean>(false);
-
-  // Verify token with Microsoft Graph API
-  const verifyTokenCallback = useCallback(async (accessToken: string): Promise<boolean> => {
-    return await verifyToken(accessToken);
-  }, []);
 
   // Authentication check BEFORE rendering
   useEffect(() => {
@@ -40,18 +36,9 @@ export default function SharedChatPage() {
           return;
         }
 
-        if (!user.access_token) {
-          console.log('[AUTH] No access token found, redirecting to login');
-          localStorage.removeItem('user');
-          router.replace(`/login?redirect=/chat/shared/${shareToken}`);
-          return;
-        }
-
-        console.log('[AUTH] Verifying access token...');
-        const isValid = await verifyTokenCallback(user.access_token);
-        
-        if (!isValid) {
-          console.log('[AUTH] Token is invalid or expired, redirecting to login');
+        const sessionValid = await checkSession();
+        if (!sessionValid) {
+          console.log('[AUTH] Session invalid or expired, redirecting to login');
           localStorage.removeItem('user');
           router.replace(`/login?error=session_expired&redirect=/chat/shared/${shareToken}`);
           return;
@@ -79,7 +66,7 @@ export default function SharedChatPage() {
     };
 
     checkAuth();
-  }, [router, shareToken, verifyTokenCallback]);
+  }, [router, shareToken]);
 
   // Load shared chat after authentication
   useEffect(() => {
@@ -92,39 +79,14 @@ export default function SharedChatPage() {
     const loadSharedChat = async () => {
       try {
         const user = getCurrentUser();
-        if (!user || !user.access_token) {
+        if (!user) {
           throw new Error('User not authenticated');
         }
 
         console.log('[SHARED] Loading shared chat with token:', shareToken);
 
-        // Determine API base URL
-        const hostname = window.location.hostname;
-        let apiBase = '';
-        
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002';
-        } else if (hostname === 'ai.cloudfuze.com') {
-          apiBase = 'https://ai.cloudfuze.com';
-        } else {
-          const origin = window.location.origin;
-          apiBase = origin.startsWith('http://') && hostname !== 'localhost' && hostname !== '127.0.0.1'
-            ? origin.replace('http://', 'https://')
-            : origin;
-        }
-
-        // Call backend API to retrieve and copy shared chat
-        const endpoint = `${apiBase}/chat/shared/${shareToken}`;
-        const tokenPreview = user.access_token?.substring(0, 20) + '...';
-        console.log('[SHARED] Calling endpoint:', endpoint);
-        console.log('[SHARED] Auth header: Bearer ' + tokenPreview);
-
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${user.access_token}`,
-            'Content-Type': 'application/json'
-          }
+        const response = await apiFetch(`/chat/shared/${shareToken}`, {
+          method: 'GET'
         });
 
         console.log('[SHARED] API response status:', response.status);

@@ -128,10 +128,10 @@ export default function ChatSessionPage() {
         // Try to fetch from backend
         console.log('[SESSION] Session not found in localStorage, trying backend:', sessionId);
         try {
-          const user = getCurrentUser();
-          if (!user || !user.access_token) {
-            throw new Error('Not authenticated');
-          }
+        const user = getCurrentUser();
+        if (!user || !user.id) {
+          throw new Error('Not authenticated');
+        }
           
           // ✅ Session-based auth - session_id cookie sent automatically via proxy
           const response = await apiFetch(`/chat/sessions/${sessionId}?include_messages=true`, {

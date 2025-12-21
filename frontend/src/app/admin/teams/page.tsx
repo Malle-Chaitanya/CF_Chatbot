@@ -97,10 +97,6 @@ export default function TeamsAnalyticsPage() {
         'Content-Type': 'application/json',
       };
 
-      if (user.access_token) {
-        headers['Authorization'] = `Bearer ${user.access_token}`;
-      }
-
       const url = `${apiBase}/analytics/langfuse/teams/summary?time_filter=${filter}`;
       console.log('[Teams Fetch] Attempting to fetch from:', url);
       console.log('[Teams Fetch] Headers:', headers);
@@ -193,13 +189,9 @@ export default function TeamsAnalyticsPage() {
       if (!user) return;
 
       const apiBase = getApiBase();
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
-      if (user.access_token) {
-        headers['Authorization'] = `Bearer ${user.access_token}`;
-      }
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
 
       const response = await fetch(
         `${apiBase}/analytics/langfuse/teams/details/${encodeURIComponent(teamName)}?time_filter=${appliedFilter}`,
