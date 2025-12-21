@@ -26,7 +26,7 @@ services:
       - ENABLE_DOC_SOURCE=${ENABLE_DOC_SOURCE:-false}
       - ENABLE_SHAREPOINT_SOURCE=${ENABLE_SHAREPOINT_SOURCE:-false}
       - ENABLE_OUTLOOK_SOURCE=${ENABLE_OUTLOOK_SOURCE:-false}
-      - WEB_SOURCE_URL=${WEB_SOURCE_URL:-https://cloudfuze.com/wp-json/wp/v2/posts?per_page=100}
+      - WEB_SOURCE_URL=${WEB_SOURCE_URL:-https://cloudfuze.com/wp-json/wp/v2/posts?per_page=49}
       - PDF_SOURCE_DIR=${PDF_SOURCE_DIR:-./pdfs}
       - EXCEL_SOURCE_DIR=${EXCEL_SOURCE_DIR:-./excel}
       - DOC_SOURCE_DIR=${DOC_SOURCE_DIR:-./docs}

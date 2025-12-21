@@ -650,10 +650,31 @@ export function initializeChatApp(options: InitOptions = {}) {
       if (response.ok) {
         console.log('[SESSION SYNC] Successfully synced to backend');
       } else {
-        console.error('[SESSION SYNC] Failed with status:', response.status);
+        // ✅ Improved error handling for 502 and other errors
+        const errorText = await response.text().catch(() => 'No error details');
+        console.error('[SESSION SYNC] Failed with status:', response.status, {
+          statusText: response.statusText,
+          error: errorText,
+          sessionId: sessionData.id,
+          messageCount: sessionData.messages.length
+        });
+        
+        // ✅ Don't throw error - session sync failure shouldn't break the app
+        // The session is still saved locally, so it's not critical
+        if (response.status === 502) {
+          console.warn('[SESSION SYNC] Backend unavailable (502) - session saved locally only');
+        }
       }
     } catch (error) {
-      console.error('[SESSION] Failed to sync session to backend:', error);
+      // ✅ Better error logging
+      console.error('[SESSION] Failed to sync session to backend:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        sessionId: sessionData.id
+      });
+      
+      // ✅ Don't throw - session is saved locally, sync can retry later
+      console.warn('[SESSION SYNC] Session saved locally - will retry sync on next save');
     }
   }
   

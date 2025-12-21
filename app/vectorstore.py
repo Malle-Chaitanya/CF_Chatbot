@@ -142,17 +142,34 @@ def get_changed_sources():
     
     # Check if any sources have changed their content
     for source in enabled_sources:
-        if stored_metadata.get(source) != current_metadata.get(source):
-            print(f"[!] {source} has changed")
-            print(f"   Stored: {stored_metadata.get(source)}")
-            print(f"   Current: {current_metadata.get(source)}")
-            if source not in changed_sources:
-                changed_sources.append(source)
+        if source == "web":
+            # For web source, check the URL specifically (stored in "url" key, not "web" key)
+            stored_url = stored_metadata.get("url")
+            current_url = current_metadata.get("url")
+            if stored_url != current_url:
+                print(f"[!] web URL has changed")
+                print(f"   Stored: {stored_url}")
+                print(f"   Current: {current_url}")
+                if "web" not in changed_sources:
+                    changed_sources.append("web")
+        else:
+            # For other sources, use the source name as key
+            if stored_metadata.get(source) != current_metadata.get(source):
+                print(f"[!] {source} has changed")
+                print(f"   Stored: {stored_metadata.get(source)}")
+                print(f"   Current: {current_metadata.get(source)}")
+                if source not in changed_sources:
+                    changed_sources.append(source)
 
     # Additional check: if web pagination changed, mark web as changed
     if "web" in enabled_sources:
         if stored_metadata.get("web_pagination") != current_metadata.get("web_pagination"):
             print("[!] web pagination settings have changed")
+            if "web" not in changed_sources:
+                changed_sources.append("web")
+        # ALWAYS check for new blogs when web source is enabled (for incremental updates)
+        elif "web" not in changed_sources:
+            print("[!] Web source enabled - checking for latest blogs (incremental update)")
             changed_sources.append("web")
     
     if changed_sources:
@@ -313,8 +330,24 @@ def build_enhanced_vectorstore_full() -> Chroma:
     """
     Build vectorstore using EnhancedVectorstoreBuilder for ALL enabled sources.
     This is the main ingestion pipeline for Option E.
+    
+    SMART MODE: If vectorstore exists, only fetches latest blogs for incremental update.
+    If vectorstore doesn't exist, builds from scratch with all sources.
     """
     print("[*] Building enhanced vectorstore with semantic chunking + dedup + graph")
+
+    # Check if vectorstore already exists
+    existing_vectorstore = None
+    if os.path.exists(CHROMA_DB_PATH):
+        print("[*] Existing vectorstore found - using incremental mode for blogs")
+        try:
+            existing_vectorstore = load_existing_vectorstore()
+            if existing_vectorstore:
+                print(f"[OK] Loaded existing vectorstore with {existing_vectorstore._collection.count()} documents")
+        except Exception as e:
+            print(f"[WARN] Failed to load existing vectorstore: {e}")
+            print("[*] Will build from scratch")
+            existing_vectorstore = None
 
     builder = EnhancedVectorstoreBuilder()
     reporter = builder.reporter  # already created inside EnhancedVectorstoreBuilder
@@ -324,10 +357,20 @@ def build_enhanced_vectorstore_full() -> Chroma:
     # ---- WEB / BLOG (if you use it) ----
     if ENABLE_WEB_SOURCE:
         try:
-            from app.helpers import fetch_web_content
+            from app.helpers import fetch_latest_web_content, fetch_web_content
             from config import WEB_SOURCE_URL
-            web_docs = fetch_web_content(WEB_SOURCE_URL)
-            print(f"[INGEST] Web docs: {len(web_docs)}")
+            
+            if existing_vectorstore:
+                # INCREMENTAL MODE: Only fetch latest blogs
+                print("[*] INCREMENTAL MODE: Fetching only latest 50 blogs...")
+                web_docs = fetch_latest_web_content(WEB_SOURCE_URL, max_posts=100)
+                print(f"[INGEST] Latest blog docs: {len(web_docs)}")
+            else:
+                # FULL BUILD MODE: Fetch all blogs
+                print("[*] FULL BUILD MODE: Fetching all blogs...")
+                web_docs = fetch_web_content(WEB_SOURCE_URL)
+                print(f"[INGEST] Web docs: {len(web_docs)}")
+            
             chunks = builder.process_documents(web_docs, source_type="web")
             all_chunks.extend(chunks)
         except Exception as e:
@@ -335,58 +378,73 @@ def build_enhanced_vectorstore_full() -> Chroma:
 
     # ---- PDF ----
     if ENABLE_PDF_SOURCE and os.path.exists(PDF_SOURCE_DIR):
-        try:
-            from app.helpers import process_pdf_files
-            pdf_docs = process_pdf_files(PDF_SOURCE_DIR)
-            print(f"[INGEST] PDF docs: {len(pdf_docs)}")
-            chunks = builder.process_documents(pdf_docs, source_type="pdf")
-            all_chunks.extend(chunks)
-        except Exception as e:
-            print(f"[WARN] PDF ingestion failed: {e}")
+        if not existing_vectorstore:  # Only process PDFs if building from scratch
+            try:
+                from app.helpers import process_pdf_files
+                pdf_docs = process_pdf_files(PDF_SOURCE_DIR)
+                print(f"[INGEST] PDF docs: {len(pdf_docs)}")
+                chunks = builder.process_documents(pdf_docs, source_type="pdf")
+                all_chunks.extend(chunks)
+            except Exception as e:
+                print(f"[WARN] PDF ingestion failed: {e}")
+        else:
+            print("[INFO] Skipping PDF ingestion in incremental mode")
 
     # ---- EXCEL ----
     if ENABLE_EXCEL_SOURCE and os.path.exists(EXCEL_SOURCE_DIR):
-        try:
-            from app.helpers import process_excel_files
-            excel_docs = process_excel_files(EXCEL_SOURCE_DIR)
-            print(f"[INGEST] Excel docs: {len(excel_docs)}")
-            chunks = builder.process_documents(excel_docs, source_type="excel")
-            all_chunks.extend(chunks)
-        except Exception as e:
-            print(f"[WARN] Excel ingestion failed: {e}")
+        if not existing_vectorstore:  # Only process Excel if building from scratch
+            try:
+                from app.helpers import process_excel_files
+                excel_docs = process_excel_files(EXCEL_SOURCE_DIR)
+                print(f"[INGEST] Excel docs: {len(excel_docs)}")
+                chunks = builder.process_documents(excel_docs, source_type="excel")
+                all_chunks.extend(chunks)
+            except Exception as e:
+                print(f"[WARN] Excel ingestion failed: {e}")
+        else:
+            print("[INFO] Skipping Excel ingestion in incremental mode")
 
     # ---- WORD DOCS ----
     if ENABLE_DOC_SOURCE and os.path.exists(DOC_SOURCE_DIR):
-        try:
-            from app.helpers import process_doc_files
-            doc_docs = process_doc_files(DOC_SOURCE_DIR)
-            print(f"[INGEST] Word docs: {len(doc_docs)}")
-            chunks = builder.process_documents(doc_docs, source_type="doc")
-            all_chunks.extend(chunks)
-        except Exception as e:
-            print(f"[WARN] Doc ingestion failed: {e}")
+        if not existing_vectorstore:  # Only process Word docs if building from scratch
+            try:
+                from app.helpers import process_doc_files
+                doc_docs = process_doc_files(DOC_SOURCE_DIR)
+                print(f"[INGEST] Word docs: {len(doc_docs)}")
+                chunks = builder.process_documents(doc_docs, source_type="doc")
+                all_chunks.extend(chunks)
+            except Exception as e:
+                print(f"[WARN] Doc ingestion failed: {e}")
+        else:
+            print("[INFO] Skipping Word doc ingestion in incremental mode")
 
     # ---- SHAREPOINT ----
     if ENABLE_SHAREPOINT_SOURCE:
-        try:
-            from app.sharepoint_processor import process_sharepoint_content
-            sp_docs = process_sharepoint_content()
-            print(f"[INGEST] SharePoint docs: {len(sp_docs)}")
-            chunks = builder.process_documents(sp_docs, source_type="sharepoint")
-            all_chunks.extend(chunks)
-        except Exception as e:
-            print(f"[WARN] SharePoint ingestion failed: {e}")
+        if not existing_vectorstore:  # Only process SharePoint if building from scratch
+            try:
+                from app.sharepoint_processor import process_sharepoint_content
+                sp_docs = process_sharepoint_content()
+                print(f"[INGEST] SharePoint docs: {len(sp_docs)}")
+                chunks = builder.process_documents(sp_docs, source_type="sharepoint")
+                all_chunks.extend(chunks)
+            except Exception as e:
+                print(f"[WARN] SharePoint ingestion failed: {e}")
+        else:
+            print("[INFO] Skipping SharePoint ingestion in incremental mode")
 
     # ---- OUTLOOK / EMAIL ----
     if ENABLE_OUTLOOK_SOURCE:
-        try:
-            from app.outlook_processor import process_outlook_content
-            email_docs = process_outlook_content()
-            print(f"[INGEST] Email docs: {len(email_docs)}")
-            chunks = builder.process_documents(email_docs, source_type="email")
-            all_chunks.extend(chunks)
-        except Exception as e:
-            print(f"[WARN] Outlook ingestion failed: {e}")
+        if not existing_vectorstore:  # Only process Outlook if building from scratch
+            try:
+                from app.outlook_processor import process_outlook_content
+                email_docs = process_outlook_content()
+                print(f"[INGEST] Email docs: {len(email_docs)}")
+                chunks = builder.process_documents(email_docs, source_type="email")
+                all_chunks.extend(chunks)
+            except Exception as e:
+                print(f"[WARN] Outlook ingestion failed: {e}")
+        else:
+            print("[INFO] Skipping Outlook ingestion in incremental mode")
 
     print(f"[INGEST] Total enhanced chunks: {len(all_chunks)}")
 

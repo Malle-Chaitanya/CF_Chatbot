@@ -76,6 +76,104 @@ def load_webpage(url: str):
             texts.append(post["content"]["rendered"])
     return "\n\n".join(texts)
 
+def fetch_latest_web_content(url: str, max_posts: int = 50):
+    """Fetch only the latest blog posts (first page, limited to max_posts).
+    
+    This is optimized for incremental updates - only fetches newest posts.
+    WordPress API returns posts in reverse chronological order (newest first).
+    
+    Args:
+        url: WordPress API URL
+        max_posts: Maximum number of latest posts to fetch (default: 50)
+    
+    Returns:
+        List of Document objects for latest blog posts
+    """
+    # Fetch only first page (newest posts come first)
+    parsed = urlparse(url)
+    base_url = urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
+    base_params = dict(parse_qsl(parsed.query))
+    
+    # Check if per_page is specified in URL
+    url_per_page = base_params.get("per_page")
+    if url_per_page:
+        try:
+            url_per_page_int = int(url_per_page)
+            # Use the smaller of URL's per_page or max_posts
+            effective_per_page = min(url_per_page_int, max_posts, BLOG_POSTS_PER_PAGE)
+            print(f"Fetching latest {effective_per_page} blog posts from WordPress API (using per_page={url_per_page} from URL, limited to {max_posts})...")
+        except ValueError:
+            effective_per_page = min(max_posts, BLOG_POSTS_PER_PAGE)
+            print(f"Fetching latest {effective_per_page} blog posts from WordPress API...")
+    else:
+        effective_per_page = min(max_posts, BLOG_POSTS_PER_PAGE)
+        print(f"Fetching latest {effective_per_page} blog posts from WordPress API...")
+    
+    # Remove page and per_page from params (we'll set them explicitly)
+    base_params.pop("page", None)
+    base_params.pop("per_page", None)
+    
+    # Fetch only first page with limited posts
+    data = fetch_posts(
+        base_url,
+        per_page=effective_per_page,
+        max_pages=1,  # Only first page
+        start_page=1,
+        extra_params=base_params,
+    )
+    
+    # Limit to max_posts if we got more
+    if len(data) > max_posts:
+        data = data[:max_posts]
+    
+    all_docs = []
+    posts_processed = 0
+    
+    # Process each blog post separately to preserve metadata
+    for post in data:
+        if "content" not in post or "rendered" not in post["content"]:
+            continue
+        
+        # Extract post metadata from WordPress API response
+        title = post.get("title", {}).get("rendered", "Untitled")
+        slug = post.get("slug", "")
+        link = post.get("link", "")  # Full URL to the blog post
+        content = post["content"]["rendered"]
+        
+        # Clean HTML tags from blog content
+        soup = BeautifulSoup(content, "html.parser")
+        clean_text = soup.get_text(separator="\n", strip=True)
+        
+        if not clean_text.strip():
+            continue
+        
+        # Chunk this post's content
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1500,
+            chunk_overlap=300,
+            separators=["\n\n", "\n", ". ", " ", ""],
+        )
+        
+        # Add title to content for better context
+        content_with_title = f"# {title}\n\n{clean_text}"
+        chunks = splitter.create_documents([content_with_title])
+        
+        # Add comprehensive metadata to each chunk
+        for chunk in chunks:
+            chunk.metadata["source_type"] = "web"
+            chunk.metadata["source"] = "cloudfuze_blog"
+            chunk.metadata["tag"] = "blog"
+            chunk.metadata["post_title"] = title
+            chunk.metadata["post_slug"] = slug
+            chunk.metadata["post_url"] = link
+            chunk.metadata["is_blog_post"] = True
+        
+        all_docs.extend(chunks)
+        posts_processed += 1
+    
+    print(f"[OK] Loaded {posts_processed} latest blog posts into {len(all_docs)} chunks")
+    return all_docs
+
 def fetch_web_content(url: str):
     """Fetch and chunk web content into LangChain Documents with blog post URLs and metadata.
 

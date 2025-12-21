@@ -235,7 +235,7 @@ ENABLE_SHAREPOINT_SOURCE = os.getenv("ENABLE_SHAREPOINT_SOURCE", "false").lower(
 ENABLE_OUTLOOK_SOURCE = os.getenv("ENABLE_OUTLOOK_SOURCE", "false").lower() == "true"
 
 # Source-specific settings
-WEB_SOURCE_URL = os.getenv("WEB_SOURCE_URL", "https://cloudfuze.com/wp-json/wp/v2/posts?per_page=100")
+WEB_SOURCE_URL = os.getenv("WEB_SOURCE_URL", "https://cloudfuze.com/wp-json/wp/v2/posts?per_page=49")
 PDF_SOURCE_DIR = os.getenv("PDF_SOURCE_DIR", "./pdfs")
 EXCEL_SOURCE_DIR = os.getenv("EXCEL_SOURCE_DIR", "./excel")
 DOC_SOURCE_DIR = os.getenv("DOC_SOURCE_DIR", "./docs")

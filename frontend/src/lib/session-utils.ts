@@ -124,7 +124,7 @@ export async function syncSessionToBackend(sessionData: ChatSession): Promise<vo
     if (typeof window === 'undefined') return;
     
     // ✅ Session-based auth - session_id cookie sent automatically via proxy
-    await apiFetch('/chat/sessions/save', {
+    const response = await apiFetch('/chat/sessions/save', {
       method: 'POST',
       body: JSON.stringify({
         session_id: sessionData.id,
@@ -135,8 +135,33 @@ export async function syncSessionToBackend(sessionData: ChatSession): Promise<vo
         messages: sessionData.messages
       })
     });
+    
+    if (!response.ok) {
+      // ✅ Improved error handling for 502 and other errors
+      const errorText = await response.text().catch(() => 'No error details');
+      console.error('[SESSION SYNC] Failed with status:', response.status, {
+        statusText: response.statusText,
+        error: errorText,
+        sessionId: sessionData.id,
+        messageCount: sessionData.messages.length
+      });
+      
+      if (response.status === 502) {
+        console.warn('[SESSION SYNC] Backend unavailable (502) - session saved locally only');
+      }
+    } else {
+      console.log('[SESSION SYNC] Successfully synced to backend');
+    }
   } catch (error) {
-    console.error('[SESSION] Failed to sync session to backend:', error);
+    // ✅ Better error logging
+    console.error('[SESSION] Failed to sync session to backend:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      sessionId: sessionData.id
+    });
+    
+    // ✅ Don't throw - session is saved locally, sync can retry later
+    console.warn('[SESSION SYNC] Session saved locally - will retry sync on next save');
   }
 }
 

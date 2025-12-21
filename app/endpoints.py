@@ -2221,12 +2221,36 @@ async def save_chat_session(
         if not session_data["session_id"] or not session_data["title"] or not session_data["created_at"]:
             raise HTTPException(status_code=400, detail="session_id, title, and created_at are required")
         
-        await save_session(session_data)
+        # ✅ Add timeout protection and better error handling
+        import asyncio
+        try:
+            await asyncio.wait_for(
+                save_session(session_data),
+                timeout=30.0  # 30 second timeout
+            )
+            logger.info(f"Successfully saved session {session_data['session_id']} with {session_data['message_count']} messages")
+            return {"message": "Session saved successfully", "session_id": session_data["session_id"]}
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout saving session {session_data['session_id']} - MongoDB may be slow or unresponsive")
+            raise HTTPException(
+                status_code=504,
+                detail="Session save timed out - please try again"
+            )
+        except Exception as db_error:
+            logger.error(f"Database error saving session {session_data['session_id']}: {str(db_error)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to save session: {str(db_error)}"
+            )
         
-        return {"message": "Session saved successfully", "session_id": session_data["session_id"]}
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Error in save_chat_session: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @router.get("/chat/sessions/all")
 async def get_all_chat_sessions(

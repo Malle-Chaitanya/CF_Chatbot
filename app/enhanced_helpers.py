@@ -196,6 +196,7 @@ class EnhancedVectorstoreBuilder:
     ) -> Chroma:
         """
         Build ChromaDB vectorstore from processed chunks.
+        Supports incremental builds - loads existing vectorstore if available.
         
         Args:
             all_chunks: All processed chunks
@@ -221,7 +222,78 @@ class EnhancedVectorstoreBuilder:
                     clean_metadata[key] = str(value)
             chunk.metadata = clean_metadata
         
-        # Create vectorstore with HNSW graph indexing
+        # STEP 1: Check if vectorstore exists - load and append instead of recreating
+        if os.path.exists(persist_directory):
+            print("[*] Loading existing vectorstore for incremental update...")
+            try:
+                vectorstore = Chroma(
+                    persist_directory=persist_directory,
+                    embedding_function=embeddings,
+                    collection_metadata={
+                        "hnsw:space": "cosine",
+                        "hnsw:construction_ef": 200,
+                        "hnsw:search_ef": 100,
+                        "hnsw:M": 48,
+                    }
+                )
+                
+                # STEP 2: Prevent duplicate blog embeddings
+                print("[*] Checking for duplicate blog posts...")
+                existing_slugs = set()
+                existing_urls = set()
+                
+                try:
+                    existing_docs = vectorstore.get(include=["metadatas"])
+                    for meta in existing_docs.get("metadatas", []):
+                        slug = meta.get("post_slug")
+                        url = meta.get("post_url")
+                        if slug:
+                            existing_slugs.add(slug)
+                        if url:
+                            existing_urls.add(url)
+                    print(f"[INFO] Found {len(existing_slugs)} existing blog posts in vectorstore")
+                except Exception as e:
+                    print(f"[WARN] Could not check existing blogs: {e}")
+                
+                # Filter out duplicates
+                new_chunks = []
+                duplicates = 0
+                for chunk in all_chunks:
+                    slug = chunk.metadata.get("post_slug")
+                    url = chunk.metadata.get("post_url")
+                    # Check both slug and URL to be safe
+                    if (slug and slug in existing_slugs) or (url and url in existing_urls):
+                        duplicates += 1
+                    else:
+                        new_chunks.append(chunk)
+                        # Track what we're adding
+                        if slug:
+                            existing_slugs.add(slug)
+                        if url:
+                            existing_urls.add(url)
+                
+                if duplicates > 0:
+                    print(f"[INFO] Skipping {duplicates} duplicate blog posts")
+                
+                if new_chunks:
+                    print(f"[*] Adding {len(new_chunks)} new chunks to existing vectorstore...")
+                    vectorstore.add_documents(new_chunks)
+                    print(f"[OK] Successfully added {len(new_chunks)} new chunks")
+                else:
+                    print("[INFO] No new chunks to add - all are already in vectorstore")
+                
+                total_count = vectorstore._collection.count()
+                print(f"[OK] Vectorstore updated with HNSW graph indexing")
+                print(f"[OK] Total chunks in vectorstore: {total_count}")
+                
+                return vectorstore
+                
+            except Exception as e:
+                print(f"[WARN] Failed to load existing vectorstore: {e}")
+                print("[*] Creating new vectorstore...")
+        
+        # Create new vectorstore if it doesn't exist or loading failed
+        print("[*] Creating new vectorstore...")
         vectorstore = Chroma.from_documents(
             all_chunks,
             embeddings,

@@ -60,6 +60,9 @@ async function proxyRequest(
     
     console.log(`[PROXY] ${method} ${url}`);
     
+    // ✅ STREAMING DETECTION: Check if this is a streaming endpoint
+    const isStreamingEndpoint = path.includes('/chat/stream') || path.includes('/stream');
+    
     // Get request body if present
     let body: string | undefined;
     if (method !== 'GET' && method !== 'HEAD') {
@@ -70,7 +73,87 @@ async function proxyRequest(
       }
     }
     
-    // Forward request to backend with cookies using axios
+    // ✅ STREAMING MODE: Use Node.js fetch for real-time streaming (axios buffers everything)
+    if (isStreamingEndpoint) {
+      try {
+        const browserCookies = request.headers.get('cookie') || '';
+        
+        console.log('[PROXY] 🌊 Using streaming mode (Node.js fetch)');
+        
+        const backendResponse = await fetch(url, {
+          method: method as any,
+          headers: {
+            'Content-Type': request.headers.get('content-type') || 'application/json',
+            'Cookie': browserCookies,
+          },
+          body: body,
+        });
+        
+        // Create a ReadableStream to forward chunks in real-time
+        const stream = new ReadableStream({
+          async start(controller) {
+            const reader = backendResponse.body?.getReader();
+            
+            if (!reader) {
+              controller.close();
+              return;
+            }
+            
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                  controller.close();
+                  break;
+                }
+                // Forward chunk immediately (no buffering)
+                controller.enqueue(value);
+              }
+            } catch (error) {
+              console.error('[PROXY] ❌ Streaming error:', error);
+              controller.error(error);
+            }
+          }
+        });
+        
+        // Create response with streaming body
+        const proxiedResponse = new NextResponse(stream, {
+          status: backendResponse.status,
+          statusText: backendResponse.statusText || '',
+          headers: {
+            'Content-Type': backendResponse.headers.get('content-type') || 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+          },
+        });
+        
+        // Forward Set-Cookie header if present (though streaming endpoints typically don't set cookies)
+        const setCookieHeader = backendResponse.headers.get('set-cookie');
+        if (setCookieHeader) {
+          proxiedResponse.headers.set('Set-Cookie', setCookieHeader);
+          console.log('[PROXY] ✅ Forwarded Set-Cookie header in streaming response');
+        }
+        
+        return proxiedResponse;
+      } catch (fetchError) {
+        console.error('[PROXY] ❌ Streaming fetch error:', fetchError);
+        const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+        const isConnectionRefused = errorMessage.includes('ECONNREFUSED') || errorMessage.includes('connect');
+        
+        return NextResponse.json(
+          { 
+            error: 'Backend connection failed', 
+            message: errorMessage,
+            hint: isConnectionRefused 
+              ? 'Backend server is not running. Please start it with: python server.py' 
+              : undefined
+          },
+          { status: 502 }
+        );
+      }
+    }
+    
+    // ✅ NON-STREAMING MODE: Use axios for Set-Cookie header access
     // ⚠️ CRITICAL: Use axios instead of fetch to access Set-Cookie headers
     // Node.js fetch() strips Set-Cookie headers, but axios exposes them
     let axiosResponse;
