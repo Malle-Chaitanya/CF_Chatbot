@@ -241,10 +241,34 @@ export default function TeamsAnalyticsPage() {
     );
   }
 
+  const handleBackClick = () => {
+    router.back();
+  };
+
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
+        <button
+          onClick={handleBackClick}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '6px 12px',
+            borderRadius: '999px',
+            border: '1px solid #d1d5db',
+            backgroundColor: 'white',
+            color: '#1f2937',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            marginBottom: '12px',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          ← Back
+        </button>
         <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>Team Analytics</h1>
         <p style={{ color: '#6b7280', fontSize: '16px' }}>Track team performance and questions</p>
       </div>
