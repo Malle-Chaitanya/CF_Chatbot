@@ -4853,6 +4853,15 @@ async def microsoft_oauth_callback(
         logger.error(f"[AUTH] ❌ OAuth callback exception: {str(e)}", exc_info=True)
         return {"error": f"OAuth callback failed: {str(e)}"}
 
+@router.post("/api/proxy/auth/microsoft/callback")
+async def microsoft_oauth_callback_proxy(
+    request: MicrosoftCallbackRequest,
+    http_request: Request
+):
+    """Handle Microsoft OAuth callback and exchange code for tokens (proxy path)."""
+    # Reuse the same handler as /auth/microsoft/callback
+    return await microsoft_oauth_callback(request, http_request)
+
 
 # ============================================================================
 # TEAM-WISE ANALYTICS ENDPOINTS
