@@ -1,0 +1,2330 @@
+{
+  "export_date": "2025-12-16T16:36:40.682680",
+  "total_users": 332,
+  "users": [
+    {
+      "id": "001eb48f-539c-43fe-9faa-7951a38e02be",
+      "displayName": "Pruthvi Raygol",
+      "userPrincipalName": "Pruthvi.Raygol@cloudfuze.com",
+      "mail": "Pruthvi.Raygol@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "0166a033-f9dc-4b3a-ac3a-ba3a9b0fae54",
+      "displayName": "Praveen Sunkari",
+      "userPrincipalName": "Praveen.Sunkari@cloudfuze.com",
+      "mail": "Praveen.Sunkari@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "01e14013-e86c-49cb-8200-b6df66e923cb",
+      "displayName": "Raghavan Krishnan",
+      "userPrincipalName": "Raghavan.Krishnan@cloudfuze.com",
+      "mail": "Raghavan.Krishnan@cloudfuze.com",
+      "jobTitle": "Consultant"
+    },
+    {
+      "id": "024beb11-f7ff-4660-8d78-d8be4999f154",
+      "displayName": "CloudFuze Support",
+      "userPrincipalName": "contact@cloudfuze.com",
+      "mail": "contact@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "02b29e47-c93a-4fa8-b2ed-315d97add536",
+      "displayName": "Kamal Basha",
+      "userPrincipalName": "Kamal.Basha@cloudfuze.com",
+      "mail": "Kamal.Basha@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "02b4caa6-9395-4b48-b96a-d05777f4dc4c",
+      "displayName": "Srini Kanchadapu",
+      "userPrincipalName": "Srini.Kanchadapu@cloudfuze.com",
+      "mail": "Srini.Kanchadapu@cloudfuze.com",
+      "jobTitle": "Migration Manager"
+    },
+    {
+      "id": "02e58bf8-d36a-40da-b5f1-f858f879a353",
+      "displayName": "Nikitha Gaddam",
+      "userPrincipalName": "Nikitha.Gaddam@cloudfuze.com",
+      "mail": "Nikitha.Gaddam@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "046d7911-86c8-4ef6-b5b4-a9bdfdcff69e",
+      "displayName": "Kishore",
+      "userPrincipalName": "kishore@cloudfuze.com",
+      "mail": "kishore@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "04767945-957b-4948-98eb-18c6bf122178",
+      "displayName": "Jalsha Chakma",
+      "userPrincipalName": "Jalsha.Chakma@cloudfuze.com",
+      "mail": "Jalsha.Chakma@cloudfuze.com",
+      "jobTitle": "Account Executive"
+    },
+    {
+      "id": "057f3fcd-d52b-4252-8a2a-ceca2bcb8ae5",
+      "displayName": "Lukas  Bohlander",
+      "userPrincipalName": "Lukas.Bohlander@cloudfuze.com",
+      "mail": "Lukas.Bohlander@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "06510ebe-cbf9-4bb6-9949-460af714b03b",
+      "displayName": "Shau",
+      "userPrincipalName": "shau@cloudfuze.com",
+      "mail": "shau@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "0654ae90-72b0-426d-9c21-0e246e66f5da",
+      "displayName": "Tara",
+      "userPrincipalName": "tara@cloudfuze.com",
+      "mail": "tara@cloudfuze.com",
+      "jobTitle": "QA Engineer"
+    },
+    {
+      "id": "065db8e6-652b-408b-aa80-8292e71c480e",
+      "displayName": "wm support",
+      "userPrincipalName": "wmsupport@cloudfuze.com",
+      "mail": "wmsupport@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "072186f4-c8a7-4669-ab69-f649b1d8f403",
+      "displayName": "Shivnarayan",
+      "userPrincipalName": "Shivnarayan.Telangre@cloudfuze.com",
+      "mail": "Shivnarayan.Telangre@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "0857a31e-9e65-4e5b-b823-b19ec57c6989",
+      "displayName": "Vivian Samson",
+      "userPrincipalName": "vivian.samson@cloudfuze.com",
+      "mail": "vivian.samson@cloudfuze.com",
+      "jobTitle": "Inside Sales Manager"
+    },
+    {
+      "id": "08ae0815-6864-4402-98cf-21944d669834",
+      "displayName": "Ravi Achakka",
+      "userPrincipalName": "ravic@cloudfuze.com",
+      "mail": "ravic@cloudfuze.com",
+      "jobTitle": "Senior Software Engineer"
+    },
+    {
+      "id": "08cdb1a7-58c7-4aa6-9f5a-6a1fa14140d9",
+      "displayName": "CloudFuze Feedback",
+      "userPrincipalName": "feedback@cloudfuze.com",
+      "mail": "feedback@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "0912c1f5-9a2a-4d0a-bc39-0c53ca56e131",
+      "displayName": "Hymavathi Irla",
+      "userPrincipalName": "Hymavathi@cloudfuze.com",
+      "mail": "Hymavathi@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "09368d72-94a3-433d-ada2-57e27ca0653b",
+      "displayName": "Shahid",
+      "userPrincipalName": "shahid@cloudfuze.com",
+      "mail": "shahid@cloudfuze.com",
+      "jobTitle": "QA Analyst"
+    },
+    {
+      "id": "09d9e5d0-7c7f-4880-888f-9395b3ca50e1",
+      "displayName": "Subhakar Dhanireddy",
+      "userPrincipalName": "Subhakar.Dhanireddy@cloudfuze.com",
+      "mail": "Subhakar.Dhanireddy@cloudfuze.com",
+      "jobTitle": "Technical Delivery Head"
+    },
+    {
+      "id": "0bc4b37d-1814-4c1e-9c2a-1053b903a038",
+      "displayName": "Hemadasu Kantam",
+      "userPrincipalName": "Hemadasu.Kantam@cloudfuze.com",
+      "mail": "Hemadasu.Kantam@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "0c435b62-c0b8-42b6-a91f-91b5966f82e6",
+      "displayName": "Nikita Shekher",
+      "userPrincipalName": "nikita.shekher@cloudfuze.com",
+      "mail": "nikita.shekher@cloudfuze.com",
+      "jobTitle": "Account Manager"
+    },
+    {
+      "id": "0da4c2d8-4f93-481f-9b31-e4458a05234a",
+      "displayName": "Uday Maduri",
+      "userPrincipalName": "Uday.Maduri@cloudfuze.com",
+      "mail": "Uday.Maduri@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "0dafce88-25f1-4f1b-8337-ea3a2f8f7e46",
+      "displayName": "Sivakumaram Tejaswini",
+      "userPrincipalName": "sivakumaram.tejaswini@cloudfuze.com",
+      "mail": "sivakumaram.tejaswini@cloudfuze.com",
+      "jobTitle": "Junior Migration Engineer"
+    },
+    {
+      "id": "0db0325f-d3f9-402c-850f-8619a99849a4",
+      "displayName": "Abhilasha K",
+      "userPrincipalName": "Abhilasha.Kandakatla@cloudfuze.com",
+      "mail": "Abhilasha.Kandakatla@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "0e18e661-0d0c-4683-aadb-dac1ea1c31e9",
+      "displayName": "Sunita Saha",
+      "userPrincipalName": "sunita.saha@cloudfuze.com",
+      "mail": "sunita.saha@cloudfuze.com",
+      "jobTitle": "Sr. Account Manager"
+    },
+    {
+      "id": "0e9bcc10-ec1b-4d89-a3b7-29e60b724ccf",
+      "displayName": "Saurav Rawat",
+      "userPrincipalName": "saurav.rawat@cloudfuze.com",
+      "mail": "saurav.rawat@cloudfuze.com",
+      "jobTitle": "Junior Migration Manager"
+    },
+    {
+      "id": "0f0e4577-1b36-408f-9457-bd04af231f07",
+      "displayName": "Microsoft Support",
+      "userPrincipalName": "mssupport@cloudfuze.com",
+      "mail": "mssupport@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "102327b5-5d41-4071-9f3b-3cd18ffce501",
+      "displayName": "Rashmi Ramesh",
+      "userPrincipalName": "Rashmi.Ramesh@cloudfuze.com",
+      "mail": "Rashmi.Ramesh@cloudfuze.com",
+      "jobTitle": "Technical Content Writer"
+    },
+    {
+      "id": "1024b330-9fa6-4545-a26d-fd7bfaeab029",
+      "displayName": "Giridhar Kolavasi",
+      "userPrincipalName": "giridhar.kolavasi@cloudfuze.com",
+      "mail": "giridhar.kolavasi@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "10751e78-c198-4dcf-b4b9-3b10ec8601d4",
+      "displayName": "wm support2",
+      "userPrincipalName": "wmsupport2@cloudfuze.com",
+      "mail": "wmsupport2@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "10aed35f-f985-4e41-a15b-cc9ad636d2da",
+      "displayName": "ITSupport",
+      "userPrincipalName": "ITSupport@cloudfuze.com",
+      "mail": "ITSupport@cloudfuze.com",
+      "jobTitle": "IT Support"
+    },
+    {
+      "id": "118c6b19-2956-448d-8622-cc6a8b3db130",
+      "displayName": "Abhishikth Y",
+      "userPrincipalName": "Abhishikth.Yenugula@cloudfuze.com",
+      "mail": "Abhishikth.Yenugula@cloudfuze.com",
+      "jobTitle": "Migration Manager"
+    },
+    {
+      "id": "11dc3106-162d-4e1e-9631-a7289618683b",
+      "displayName": "Nitesh Gupta",
+      "userPrincipalName": "Nitesh@cloudfuze.com",
+      "mail": "Nitesh@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "1277d780-53db-4f98-943b-cc363a8caf08",
+      "displayName": "Shiva Amuda",
+      "userPrincipalName": "Shiva.Amuda@cloudfuze.com",
+      "mail": "Shiva.Amuda@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "13563ee2-a253-4ccd-b26d-12a9924fc5ed",
+      "displayName": "Varsha",
+      "userPrincipalName": "varsha@cloudfuze.com",
+      "mail": "varsha@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "1586f144-7b5a-46da-b41c-bc4925a58c4a",
+      "displayName": "Demo's CloudFuze",
+      "userPrincipalName": "demos@cloudfuze.com",
+      "mail": "demos@cloudfuze.com",
+      "jobTitle": "Demo's CloudFuze"
+    },
+    {
+      "id": "15a52bbb-62a9-4cca-ae8b-a509b4e1690e",
+      "displayName": "Mythri K",
+      "userPrincipalName": "Mythri.Kakani@cloudfuze.com",
+      "mail": "Mythri.Kakani@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "18977b7c-e234-48fd-9b5b-b54aa43c7b74",
+      "displayName": "Laxman Kadari",
+      "userPrincipalName": "Laxman.Kadari@cloudfuze.com",
+      "mail": "Laxman.Kadari@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "192864df-3884-4f7f-9ae9-d98ac6061e79",
+      "displayName": "Sateesh Chintapalli",
+      "userPrincipalName": "Sateesh.Chintapalli@cloudfuze.com",
+      "mail": "Sateesh.Chintapalli@cloudfuze.com",
+      "jobTitle": "Admin"
+    },
+    {
+      "id": "198edf9c-a187-44a3-a731-8b39576a67cf",
+      "displayName": "Nageshkumar Mhetre",
+      "userPrincipalName": "nageshkumar.mhetre@cloudfuze.com",
+      "mail": "nageshkumar.mhetre@cloudfuze.com",
+      "jobTitle": "Trainee Software Engineer"
+    },
+    {
+      "id": "1adb91f3-3e8a-499e-b4bf-493c9206c9ea",
+      "displayName": "Kanchi Lakshmi Priya",
+      "userPrincipalName": "Kanchi.Lakshmi@cloudfuze.com",
+      "mail": "Kanchi.Lakshmi@cloudfuze.com",
+      "jobTitle": "Trainee-HR"
+    },
+    {
+      "id": "1b1352db-77eb-449b-a471-b69486130ca3",
+      "displayName": "Manoj Bathula",
+      "userPrincipalName": "Manoj.Bathula@cloudfuze.com",
+      "mail": "Manoj.Bathula@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "1be5257b-85f0-424b-829e-fb7e5bee7fd6",
+      "displayName": "Naved",
+      "userPrincipalName": "Naved.Osama@cloudfuze.com",
+      "mail": "Naved.Osama@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "1c9682db-ead3-4f00-9f40-8e32230d091c",
+      "displayName": "Ganesh  Kondameedi",
+      "userPrincipalName": "Ganesh.Kondameedi@cloudfuze.com",
+      "mail": "Ganesh.Kondameedi@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "1f0b186c-f13b-43d9-9067-0008d4fbcf72",
+      "displayName": "Product Feedback-JIRA",
+      "userPrincipalName": "product@cloudfuze.com",
+      "mail": "product@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "1f745200-194f-4a6b-a508-6f6da7c4d73c",
+      "displayName": "Akash Jadhav",
+      "userPrincipalName": "akash.jadhav@cloudfuze.com",
+      "mail": "akash.jadhav@cloudfuze.com",
+      "jobTitle": "Trainee Migration Engineer"
+    },
+    {
+      "id": "207361e6-4311-43bd-88a3-65fd49a76cf9",
+      "displayName": "Vivin Joseph",
+      "userPrincipalName": "Vivin.Joseph@cloudfuze.com",
+      "mail": "Vivin.Joseph@cloudfuze.com",
+      "jobTitle": "Account Manager"
+    },
+    {
+      "id": "21858efd-0f8a-4439-bc1d-a9d61f4f6170",
+      "displayName": "Soorapadman S",
+      "userPrincipalName": "soorapadman.s@cloudfuze.com",
+      "mail": "soorapadman.s@cloudfuze.com",
+      "jobTitle": "Sr. Java Developer"
+    },
+    {
+      "id": "21c286ee-7077-4b85-9af8-2e648a89b7ba",
+      "displayName": "Dev Staging",
+      "userPrincipalName": "devstg@cloudfuze.com",
+      "mail": "devstg@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "21eae573-b5b8-4c76-8e27-f0b3999465b3",
+      "displayName": "Sriram Ramakrishnan",
+      "userPrincipalName": "sriram.ramakrishnan@cloudfuze.com",
+      "mail": "sriram.ramakrishnan@cloudfuze.com",
+      "jobTitle": "Junior Migration Engineer"
+    },
+    {
+      "id": "23bdd258-ade1-4bb7-8d96-c0eb1726ef66",
+      "displayName": "Chandra Mouli",
+      "userPrincipalName": "chandra.mouli@cloudfuze.com",
+      "mail": "chandra.mouli@cloudfuze.com",
+      "jobTitle": "Trainee Migration Engineer"
+    },
+    {
+      "id": "23f9fb58-ce67-4e3d-96b4-1817969cc9db",
+      "displayName": "alex1",
+      "userPrincipalName": "alexcf@cloudfuze.com",
+      "mail": "alexcf@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "264d201d-6627-4a9f-8bb5-54c40dc83089",
+      "displayName": "Vignesh T",
+      "userPrincipalName": "vignesh.t@cloudfuze.com",
+      "mail": "vignesh.t@cloudfuze.com",
+      "jobTitle": "Trainee QA Engineer"
+    },
+    {
+      "id": "27ebeed7-0a40-4ea3-93d7-12e458c073ee",
+      "displayName": "Viswanadh K",
+      "userPrincipalName": "viswanadh.k@cloudfuze.com",
+      "mail": "viswanadh.k@cloudfuze.com",
+      "jobTitle": "QA Lead"
+    },
+    {
+      "id": "28dd8c54-6d7f-4932-a3d7-a7f46c923634",
+      "displayName": "Sakshi Priya",
+      "userPrincipalName": "Sakshi.Priya@cloudfuze.com",
+      "mail": "Sakshi.Priya@cloudfuze.com",
+      "jobTitle": "Sales Operations Analyst"
+    },
+    {
+      "id": "29478e02-b989-42d7-9156-015af59b9969",
+      "displayName": "Akhila Aenkoju",
+      "userPrincipalName": "Akhila.Aenkoju@cloudfuze.com",
+      "mail": "Akhila.Aenkoju@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "2a799d4d-0773-4bef-8324-f5f95d5ad2d1",
+      "displayName": "Manage Cloud",
+      "userPrincipalName": "managecloud@cloudfuze.com",
+      "mail": "managecloud@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "2b57fa40-1ffd-4ce6-909b-07bf6891c2e4",
+      "displayName": "Ranadeep",
+      "userPrincipalName": "Ranadeep.Muddam@cloudfuze.com",
+      "mail": "Ranadeep.Muddam@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "2c7630c3-a3d7-4a6a-b950-4d7c6bdbdb26",
+      "displayName": "Paresh",
+      "userPrincipalName": "Paresh.Rahate@cloudfuze.com",
+      "mail": "Paresh.Rahate@cloudfuze.com",
+      "jobTitle": "Senior Migration Manager"
+    },
+    {
+      "id": "2d72b63d-66c0-4050-95e0-119275d40a05",
+      "displayName": "Ashim Upadhyay",
+      "userPrincipalName": "Ashim.Upadhyay@cloudfuze.com",
+      "mail": "Ashim.Upadhyay@cloudfuze.com",
+      "jobTitle": "Senior Exchange Administrator"
+    },
+    {
+      "id": "2db616da-6433-4a26-8278-6666663b3030",
+      "displayName": "Fredin Scaria",
+      "userPrincipalName": "Fredin.Scaria@cloudfuze.com",
+      "mail": "Fredin.Scaria@cloudfuze.com",
+      "jobTitle": "Account Manager"
+    },
+    {
+      "id": "2e29b797-b79e-4ffd-bf6d-1d74190aad82",
+      "displayName": "Kiran Y",
+      "userPrincipalName": "Kiran.Yenimireddy@cloudfuze.com",
+      "mail": "Kiran.Yenimireddy@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "2e2a083f-f986-4ce7-be43-9aae830513a4",
+      "displayName": "Bhagyashri Deokar",
+      "userPrincipalName": "bhagyashri.deokar@cloudfuze.com",
+      "mail": "bhagyashri.deokar@cloudfuze.com",
+      "jobTitle": "Java Developer"
+    },
+    {
+      "id": "2e72d825-e8d7-4c77-bb46-d779febafd62",
+      "displayName": "Vijay  Kumar",
+      "userPrincipalName": "Vijay.Kumar@cloudfuze.com",
+      "mail": "Vijay.Kumar@cloudfuze.com",
+      "jobTitle": "Business Development Representative"
+    },
+    {
+      "id": "2fced532-de3c-41aa-a0f4-9604701ba57c",
+      "displayName": "Vineetha",
+      "userPrincipalName": "Vineetha.Yenti@cloudfuze.com",
+      "mail": "Vineetha.Yenti@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "2fea57ca-ad04-4e62-abdf-ff75a8662aea",
+      "displayName": "Zoho Projects CF Infrastructure",
+      "userPrincipalName": "zp-infrastructure@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000418059@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "3007cca7-d28d-4b03-af04-7a703433f0a2",
+      "displayName": "Royston Aden Copy",
+      "userPrincipalName": "RoystonAdenCopy@cloudfuze.com",
+      "mail": "RoystonAdenCopy@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "30b370c6-fa97-4df2-9e7f-028382a3c22e",
+      "displayName": "admin",
+      "userPrincipalName": "admin@cloudfuze.com",
+      "mail": null,
+      "jobTitle": null
+    },
+    {
+      "id": "31bc1adf-ed50-410c-b5fc-044576a8218f",
+      "displayName": "L3 Support",
+      "userPrincipalName": "L3Support@cloudfuze.com",
+      "mail": "L3Support@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "31bca130-4b3e-4bff-b7e1-67fe86fdd2c5",
+      "displayName": "Royston Aden",
+      "userPrincipalName": "RoystonAden@cloudfuze.com",
+      "mail": "RoystonAden@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "31c00f38-6c82-4afd-a512-8b2ad5f72c35",
+      "displayName": "Bhavani Asok",
+      "userPrincipalName": "Bhavani.Asok@cloudfuze.com",
+      "mail": "Bhavani.Asok@cloudfuze.com",
+      "jobTitle": "Technical Content Writer"
+    },
+    {
+      "id": "330a82c6-9145-4e3a-bbc5-2d447382ec7a",
+      "displayName": "Chitradip  Saha",
+      "userPrincipalName": "chitradip.saha@cloudfuze.com",
+      "mail": "chitradip.saha@cloudfuze.com",
+      "jobTitle": "Lead Account Manager"
+    },
+    {
+      "id": "3310cb5f-7243-4395-9483-059afc7bd0bd",
+      "displayName": "Rajini Natarajan",
+      "userPrincipalName": "rajini.natarajan@cloudfuze.com",
+      "mail": "rajini.natarajan@cloudfuze.com",
+      "jobTitle": "Sr. Enterprise Account Manager"
+    },
+    {
+      "id": "34f215a3-47b4-4810-8443-78f8899d06d3",
+      "displayName": "Sonali Lunia",
+      "userPrincipalName": "sonali.lunia@cloudfuze.com",
+      "mail": "sonali.lunia@cloudfuze.com",
+      "jobTitle": "Junior Migration Engineer"
+    },
+    {
+      "id": "36aef1a9-ebbf-4c5f-ab80-b29e8f140792",
+      "displayName": "Raju A",
+      "userPrincipalName": "appala.r@cloudfuze.com",
+      "mail": "appala.r@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "37ed0ce0-ba60-4624-a029-b302d535914e",
+      "displayName": "Mohammad Sharique",
+      "userPrincipalName": "sharique@cloudfuze.com",
+      "mail": "sharique@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "388aaa4d-8340-483e-ab9c-146ccda439c8",
+      "displayName": "Praveen vancharla",
+      "userPrincipalName": "Praveen.V@cloudfuze.com",
+      "mail": "Praveen.V@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "38e5d1f9-3dee-45ad-a3b2-202f5104a5f7",
+      "displayName": "Srikanth Tammali",
+      "userPrincipalName": "srikanth.tammali@cloudfuze.com",
+      "mail": "srikanth.tammali@cloudfuze.com",
+      "jobTitle": "Sr. Graphic Designer"
+    },
+    {
+      "id": "3b253cbe-ef43-431d-a0b8-3c4c6f796eb1",
+      "displayName": "Bharath Tummaganti",
+      "userPrincipalName": "Bharath.Tummaganti@cloudfuze.com",
+      "mail": "Bharath.Tummaganti@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "3b2b48c3-ea0b-4518-9fa9-8b04648d08b6",
+      "displayName": "Book a Slot with Nitesh Gupta",
+      "userPrincipalName": "BookaSlotwithNiteshGupta@cloudfuze.com",
+      "mail": "BookaSlotwithNiteshGupta@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "3beaa95f-cd65-49c1-832b-87d81f17e146",
+      "displayName": "Aanchal Tyagi",
+      "userPrincipalName": "aanchal.tyagi@cloudfuze.com",
+      "mail": "aanchal.tyagi@cloudfuze.com",
+      "jobTitle": "Junior Migration Engineer"
+    },
+    {
+      "id": "3c3062d0-da77-40ee-a0fc-23933ab82b29",
+      "displayName": "Vishal Kumar",
+      "userPrincipalName": "Vishal.Kumar@cloudfuze.com",
+      "mail": "Vishal.Kumar@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "402c0f6e-7866-4a88-9134-de224e460bb6",
+      "displayName": "Shailesh Soniwal",
+      "userPrincipalName": "shailesh.soniwal@cloudfuze.com",
+      "mail": "shailesh.soniwal@cloudfuze.com",
+      "jobTitle": "Digital Marketing Executive"
+    },
+    {
+      "id": "40df5e47-c197-48f4-ae25-79e60ab968aa",
+      "displayName": "CloudFuze SAAS",
+      "userPrincipalName": "admin.saas@cloudfuze.com",
+      "mail": "admin.saas@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "4163dca7-5f82-4735-954b-9f84f09303a7",
+      "displayName": "Support Emails",
+      "userPrincipalName": "supportemails@cloudfuze.com",
+      "mail": "supportemails@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "425251a2-35e8-4fef-ab98-fd3f7721bed0",
+      "displayName": "Vamsi Malla",
+      "userPrincipalName": "Vamsi.Malla@cloudfuze.com",
+      "mail": "Vamsi.Malla@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "426ee0f3-2e51-4c4f-8b1f-45b64862aca7",
+      "displayName": "Vipra Mishra",
+      "userPrincipalName": "vipra.mishra@cloudfuze.com",
+      "mail": "vipra.mishra@cloudfuze.com",
+      "jobTitle": "Sr. Talent Acquisition Specialist"
+    },
+    {
+      "id": "431a7b40-c095-472d-9f3f-db69995c327a",
+      "displayName": "Yogesh T",
+      "userPrincipalName": "Yogesh.Talurmath@cloudfuze.com",
+      "mail": "Yogesh.Talurmath@cloudfuze.com",
+      "jobTitle": "Senior Account Manager"
+    },
+    {
+      "id": "43e068a5-119a-4f29-a1aa-16e3c7ecfc12",
+      "displayName": "Nirosh Reddy",
+      "userPrincipalName": "nirosh.reddy@cloudfuze.com",
+      "mail": "nirosh.reddy@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "448842c7-68a2-49d3-a33e-a88abc3afe7b",
+      "displayName": "Manu Chawla",
+      "userPrincipalName": "manu@cloudfuze.com",
+      "mail": "manu@cloudfuze.com",
+      "jobTitle": "Senior Enterprise Account Manager"
+    },
+    {
+      "id": "44ae08c4-2ef0-4d8b-adbe-c966bf8e3b03",
+      "displayName": "Ishwar Yadav",
+      "userPrincipalName": "ishwar.yadav@cloudfuze.com",
+      "mail": "ishwar.yadav@cloudfuze.com",
+      "jobTitle": "Trainee Migration Engineer"
+    },
+    {
+      "id": "45a49480-82e0-4713-9a41-9431c20d2b32",
+      "displayName": "Sreyas Panda",
+      "userPrincipalName": "sreyas.panda@cloudfuze.com",
+      "mail": "sreyas.panda@cloudfuze.com",
+      "jobTitle": "Java Developer"
+    },
+    {
+      "id": "4671f818-db8e-4688-a723-a4f67915f693",
+      "displayName": "Jyothi Maloth",
+      "userPrincipalName": "jyothi@cloudfuze.com",
+      "mail": "jyothi@cloudfuze.com",
+      "jobTitle": "Marketing Manager"
+    },
+    {
+      "id": "46894a94-0f65-4a22-80f3-11cdc3c97068",
+      "displayName": "Sakshi Bali",
+      "userPrincipalName": "sakshi.bali@cloudfuze.com",
+      "mail": "sakshi.bali@cloudfuze.com",
+      "jobTitle": "Senior Content Marketer"
+    },
+    {
+      "id": "47d2c8ac-7f60-49b4-87e3-23e9f19a649b",
+      "displayName": "Demo Booking",
+      "userPrincipalName": "DemoBooking@cloudfuze.com",
+      "mail": "DemoBooking@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "47f68cf4-39fb-447d-9db0-7b43ebabe334",
+      "displayName": "Abdul Nazma",
+      "userPrincipalName": "abdul.nazma@cloudfuze.com",
+      "mail": "abdul.nazma@cloudfuze.com",
+      "jobTitle": "QA Engineer "
+    },
+    {
+      "id": "4a5fc7ee-8c0c-4538-838a-87703f824487",
+      "displayName": "CloudFuze Careers",
+      "userPrincipalName": "careers@cloudfuze.com",
+      "mail": "careers@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "4ab96e2b-4668-47a1-b68d-33a876a87a2a",
+      "displayName": "Yashi Shivhare",
+      "userPrincipalName": "yashi.shivhare@cloudfuze.com",
+      "mail": "yashi.shivhare@cloudfuze.com",
+      "jobTitle": "Talent Acquisition Specialist"
+    },
+    {
+      "id": "4abb9a1a-1f1e-412e-a883-1eabc7fdbca9",
+      "displayName": "Rahul Gowda",
+      "userPrincipalName": "Rahul.Gowda@cloudfuze.com",
+      "mail": "Rahul.Gowda@cloudfuze.com",
+      "jobTitle": "Sales Operations Analyst"
+    },
+    {
+      "id": "4b2b563d-b1ca-406b-b4b9-705b307ac885",
+      "displayName": "Karthik Brahmakal",
+      "userPrincipalName": "Karthik.Brahmakal@cloudfuze.com",
+      "mail": "Karthik.Brahmakal@cloudfuze.com",
+      "jobTitle": "Senior BDM Manager"
+    },
+    {
+      "id": "4b9eaa2e-1124-4834-bf8b-389cd2030fb6",
+      "displayName": "Vishnu Gundu",
+      "userPrincipalName": "vishnu.gundu@cloudfuze.com",
+      "mail": "vishnu.gundu@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "4bc1deac-ab54-45b8-a51a-36d65ee1af68",
+      "displayName": "Satya Pinniti",
+      "userPrincipalName": "Satya.Pinniti@cloudfuze.com",
+      "mail": "Satya.Pinniti@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "4c2b6e43-5377-43be-b9ae-ad640fedd2d8",
+      "displayName": "Srinadh Pala",
+      "userPrincipalName": "srinadh.pala@cloudfuze.com",
+      "mail": "srinadh.pala@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "4d4e6753-58f8-4662-b350-b89dcc73917c",
+      "displayName": "Sushmitha Esther",
+      "userPrincipalName": "Sushmitha.Esther@cloudfuze.com",
+      "mail": "Sushmitha.Esther@cloudfuze.com",
+      "jobTitle": "Business Development Representative"
+    },
+    {
+      "id": "4daf9589-e9cf-470a-a310-ece93d08a7cd",
+      "displayName": "Anthony Raymond",
+      "userPrincipalName": "anthony@cloudfuze.com",
+      "mail": "anthony@cloudfuze.com",
+      "jobTitle": "Senior Account Manager"
+    },
+    {
+      "id": "4ebb0c18-3979-4ed1-ac9d-b35e9ccdddab",
+      "displayName": "Indu Biswakarma",
+      "userPrincipalName": "indu.biswakarma@cloudfuze.com",
+      "mail": "indu.biswakarma@cloudfuze.com",
+      "jobTitle": "Service Delivery Manager"
+    },
+    {
+      "id": "4f336db7-3ac6-4cb4-9a46-8263dad8bff8",
+      "displayName": "Rebecca Valentina",
+      "userPrincipalName": "rebecca.valentina@cloudfuze.com",
+      "mail": "rebecca.valentina@cloudfuze.com",
+      "jobTitle": "Business Development Representative"
+    },
+    {
+      "id": "4fa7269e-0f97-4e4b-8838-fc910514f948",
+      "displayName": "Zoho Projects Customer Success",
+      "userPrincipalName": "zp-customersupport@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000186121@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "519e36ee-70aa-4a92-8da3-7ec76cfcd957",
+      "displayName": "Dipali",
+      "userPrincipalName": "dipali@cloudfuze.com",
+      "mail": "dipali@cloudfuze.com",
+      "jobTitle": "Junior Migration Engineer"
+    },
+    {
+      "id": "520bef3a-a154-4ec1-a3f4-8d0445c795a4",
+      "displayName": "Ketan Wankhede",
+      "userPrincipalName": "ketan.wankhede@cloudfuze.com",
+      "mail": "ketan.wankhede@cloudfuze.com",
+      "jobTitle": "Junior Migration Manager"
+    },
+    {
+      "id": "546473b1-38e5-462d-953c-3caf2932afca",
+      "displayName": "Jaswanth Adari",
+      "userPrincipalName": "Jaswanth.Adari@cloudfuze.com",
+      "mail": "Jaswanth.Adari@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "562e999c-5495-4d02-a914-45698ae3d09d",
+      "displayName": "Rayman Varusai",
+      "userPrincipalName": "Rayman@cloudfuze.com",
+      "mail": "Rayman@cloudfuze.com",
+      "jobTitle": "Account Manager"
+    },
+    {
+      "id": "56fe1797-e371-4119-a5cb-09da174c6b0c",
+      "displayName": "Zoho Projects Marketing",
+      "userPrincipalName": "zp-marketing@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000186145@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "5738bf3b-4f29-42ed-829d-29c099b34d1a",
+      "displayName": "Raviteja",
+      "userPrincipalName": "Raviteja.Dudipalli@cloudfuze.com",
+      "mail": "Raviteja.Dudipalli@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "5752274e-487e-4950-a590-fc5e8a92ab9f",
+      "displayName": "Ravi Poli",
+      "userPrincipalName": "ravi.poli@cloudfuze.com",
+      "mail": "ravi.poli@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "5764ae13-23fb-4157-aea5-fc6a66372314",
+      "displayName": "Sruthi Chimata",
+      "userPrincipalName": "Sruthi.Chimata@cloudfuze.com",
+      "mail": "Sruthi.Chimata@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "5777c139-9a69-4f9b-b383-59c5ef264f9a",
+      "displayName": "CloudFuze Alerts",
+      "userPrincipalName": "alerts@cloudfuze.com",
+      "mail": "alerts@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "595be5cc-ae60-4ca6-a92e-4144149b6c75",
+      "displayName": "Burke Johnson",
+      "userPrincipalName": "burke.johnson@cloudfuze.com",
+      "mail": "burke.johnson@cloudfuze.com",
+      "jobTitle": "Account Executive"
+    },
+    {
+      "id": "59ea7887-bbea-41c7-b0ba-48583ba93813",
+      "displayName": "Migration Support",
+      "userPrincipalName": "helpdesk@cloudfuze.com",
+      "mail": "migrationsupport@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "5a31bb9e-d49f-4ce7-a7e9-5d5511892179",
+      "displayName": "Sravani",
+      "userPrincipalName": "Avagadda.Sravani@cloudfuze.com",
+      "mail": "Avagadda.Sravani@cloudfuze.com",
+      "jobTitle": "Senior DevOps Engineer"
+    },
+    {
+      "id": "5c6a8bd8-fa17-4e46-adbe-14ff52b2fff0",
+      "displayName": "CloudFuze Pre-Sales",
+      "userPrincipalName": "PreSales@cloudfuze.com",
+      "mail": "PreSales@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "5e3a7567-2a38-4748-b265-8ec5e70eb689",
+      "displayName": "Lakshmi Prasanna",
+      "userPrincipalName": "Lakshmi.Prasanna@cloudfuze.com",
+      "mail": "Lakshmi.Prasanna@cloudfuze.com",
+      "jobTitle": "Migration Engineer"
+    },
+    {
+      "id": "5e52974a-a1a8-401c-baf7-8ed60c278d4b",
+      "displayName": "Akshay Raina",
+      "userPrincipalName": "Akshay.Raina@cloudfuze.com",
+      "mail": "Akshay.Raina@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "614273a5-3d86-4102-9e20-36d379bd7f71",
+      "displayName": "Lakshmi Adabala",
+      "userPrincipalName": "Lakshmi.Adabala@cloudfuze.com",
+      "mail": "Lakshmi.Adabala@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "614c5dba-d380-4ac5-a07b-d35579c8848c",
+      "displayName": "Cloudfuze Process",
+      "userPrincipalName": "process@cloudfuze.com",
+      "mail": "process@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "618d3b34-afbb-4776-8fef-6e2866cb3e14",
+      "displayName": "Sunny Kumar",
+      "userPrincipalName": "sunny.kumar@cloudfuze.com",
+      "mail": "sunny.kumar@cloudfuze.com",
+      "jobTitle": "Sr. Enterprise Account Manager"
+    },
+    {
+      "id": "62b3566c-b86e-480c-90b8-0aa356dc8f0c",
+      "displayName": "Lakshmi Priya",
+      "userPrincipalName": "lakshmi.priya@cloudfuze.com",
+      "mail": "lakshmi.priya@cloudfuze.com",
+      "jobTitle": "Sales Consultant"
+    },
+    {
+      "id": "62b929af-3926-4ad4-b96e-ea563cd9b3dc",
+      "displayName": "Nagu",
+      "userPrincipalName": "Nagu.Aitagoni@cloudfuze.com",
+      "mail": "Nagu.Aitagoni@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "62edca45-585f-4c8d-baaf-c16b7c962d2d",
+      "displayName": "Akshay Thakre",
+      "userPrincipalName": "akshay.thakre@cloudfuze.com",
+      "mail": "akshay.thakre@cloudfuze.com",
+      "jobTitle": "Trainee Migration Engineer"
+    },
+    {
+      "id": "64424698-9ae3-4a4d-851d-11dede22f5f8",
+      "displayName": "Sidd",
+      "userPrincipalName": "sidd.sharma@cloudfuze.com",
+      "mail": "sidd.sharma@cloudfuze.com",
+      "jobTitle": "Sr. Business Development Manager"
+    },
+    {
+      "id": "65057160-38b6-4f63-80a0-12985baf07eb",
+      "displayName": "Diksha Rana",
+      "userPrincipalName": "diksha.rana@cloudfuze.com",
+      "mail": "diksha.rana@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "652667e2-1b38-43c5-a3ad-18b25b388e71",
+      "displayName": "Sri",
+      "userPrincipalName": "sri@cloudfuze.com",
+      "mail": "sri@cloudfuze.com",
+      "jobTitle": "Sr. Business Development Manager"
+    },
+    {
+      "id": "65378fc4-b76e-4c9a-bd46-40bd8e7cfeba",
+      "displayName": "Enterprise Support",
+      "userPrincipalName": "bizsupport@cloudfuze.com",
+      "mail": "bizsupport@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "670aa36e-bf9d-4bc1-9a87-7bef8aedb6a0",
+      "displayName": "Kritika Gupta",
+      "userPrincipalName": "Kritika.Gupta@cloudfuze.com",
+      "mail": "Kritika.Gupta@cloudfuze.com",
+      "jobTitle": "Senior Account Manager"
+    },
+    {
+      "id": "67edc701-fc98-40ca-b37c-d8e064562c71",
+      "displayName": "Usharani Eranala",
+      "userPrincipalName": "usharani.eranala@cloudfuze.com",
+      "mail": "usharani.eranala@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "68001421-49ef-406a-b7a9-897fe11f1674",
+      "displayName": "Janakiram",
+      "userPrincipalName": "Janakiram.Ankam@cloudfuze.com",
+      "mail": "Janakiram.Ankam@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "68f33aed-cc7a-4bf9-8917-c04cd33eb746",
+      "displayName": "Gururaj Bhimrao",
+      "userPrincipalName": "gururaj.bhimrao@cloudfuze.com",
+      "mail": "gururaj.bhimrao@cloudfuze.com",
+      "jobTitle": "Trainee Software Engineer"
+    },
+    {
+      "id": "6b2f07e1-77b3-427b-b0b2-34ecfc28da35",
+      "displayName": "Pragati Pandey",
+      "userPrincipalName": "Pragati.Pandey@cloudfuze.com",
+      "mail": "Pragati.Pandey@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "6b8443b4-4a26-4c98-8b5b-856bb9d0c3d4",
+      "displayName": "Baljeet Singh",
+      "userPrincipalName": "baljeet.singh@cloudfuze.com",
+      "mail": "baljeet.singh@cloudfuze.com",
+      "jobTitle": "Senior Operations Manager"
+    },
+    {
+      "id": "6ba87d92-7fd3-409d-8de6-718f7225392a",
+      "displayName": "Suditya Nimmala",
+      "userPrincipalName": "Suditya.Nimmala@cloudfuze.com",
+      "mail": "Suditya.Nimmala@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "6db533db-2025-487d-845b-678c1255287d",
+      "displayName": "Raya durai",
+      "userPrincipalName": "Raya.durai@cloudfuze.com",
+      "mail": "Raya.durai@cloudfuze.com",
+      "jobTitle": "Sales Ops Analyst"
+    },
+    {
+      "id": "6dca5cd7-834e-47df-aab1-b34029465387",
+      "displayName": "Pre-Saless CloudFuze",
+      "userPrincipalName": "pre-saless@cloudfuze.com",
+      "mail": "pre-saless@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "6e04a9a3-f3cf-4388-84a2-dcf250599f6d",
+      "displayName": "Sakshi divate",
+      "userPrincipalName": "Sakshi.divate@cloudfuze.com",
+      "mail": "Sakshi.divate@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "6e484e2e-e50f-4beb-a05f-d244c38e7b3d",
+      "displayName": "Demo Availability - Cloudfuze",
+      "userPrincipalName": "DemoAvailability@cloudfuze.com",
+      "mail": "DemoAvailability@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "70233c53-9f8f-49c7-9478-dd0ee8e9c874",
+      "displayName": "Sankey User",
+      "userPrincipalName": "sankey.user@cloudfuze.com",
+      "mail": "sankey.user@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "712389a8-825e-4b4f-bec3-512e7828c236",
+      "displayName": "CloudFuze Developers",
+      "userPrincipalName": "developer@cloudfuze.com",
+      "mail": "developer@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "71f95512-db4e-4c6c-ae72-a82501e37281",
+      "displayName": "CloudFuze",
+      "userPrincipalName": "Noreply@cloudfuze.com",
+      "mail": "Noreply@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "745cca32-0218-4530-827a-54ace5d91e00",
+      "displayName": "Naveen Narayana",
+      "userPrincipalName": "Naveen.Narayana@cloudfuze.com",
+      "mail": "Naveen.Narayana@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "76102a18-9be3-4a98-bd8d-c841d9c7a12e",
+      "displayName": "wm support3",
+      "userPrincipalName": "wmsupport3@cloudfuze.com",
+      "mail": "wmsupport3@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "775b6706-3f09-447a-917d-7760f5d7db03",
+      "displayName": "Vimalesh T",
+      "userPrincipalName": "vimalesh.t@cloudfuze.com",
+      "mail": "vimalesh.t@cloudfuze.com",
+      "jobTitle": "Trainee QA Engineer"
+    },
+    {
+      "id": "7808ce9e-193d-466a-81e6-410d68562022",
+      "displayName": "Ganesh Guda",
+      "userPrincipalName": "ganesh.guda@cloudfuze.com",
+      "mail": "ganesh.guda@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "7a4b174f-497b-4720-a685-98e36c9103c4",
+      "displayName": "Muskan",
+      "userPrincipalName": "muskan@cloudfuze.com",
+      "mail": "muskan@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "7a743c5a-df1a-4c37-9b4c-17710450e112",
+      "displayName": "Lakshma Reddy",
+      "userPrincipalName": "LakshmaReddy@cloudfuze.com",
+      "mail": "LakshmaReddy@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "7c5cdda5-1f6f-4467-b274-e1227e1a3426",
+      "displayName": "Mayank",
+      "userPrincipalName": "mayank@cloudfuze.com",
+      "mail": "mayank@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "7cadd7da-019c-41a3-bd25-9d9b427a127b",
+      "displayName": "Ravi Srivastava",
+      "userPrincipalName": "ravi.srivastava@cloudfuze.com",
+      "mail": "ravi.srivastava@cloudfuze.com",
+      "jobTitle": "Trainee Software Engineer"
+    },
+    {
+      "id": "7dcc5f2a-4215-4eb3-9cfa-9247d6d54113",
+      "displayName": "Nandini Tirumalasetti",
+      "userPrincipalName": "nandini.tirumalasetti@cloudfuze.com",
+      "mail": "nandini.tirumalasetti@cloudfuze.com",
+      "jobTitle": "Migration Engineer"
+    },
+    {
+      "id": "7fac7504-9e62-46f4-8b93-2e2b06f99dce",
+      "displayName": "Anil Gorityala",
+      "userPrincipalName": "Anil.Gorityala@cloudfuze.com",
+      "mail": "Anil.Gorityala@cloudfuze.com",
+      "jobTitle": "Senior delivery manager"
+    },
+    {
+      "id": "82797fa2-9c94-47f1-a51b-bc2862911522",
+      "displayName": "Madhushree Sunku",
+      "userPrincipalName": "madhu@cloudfuze.com",
+      "mail": "madhu@cloudfuze.com",
+      "jobTitle": "QA Engineer"
+    },
+    {
+      "id": "84e2af70-573f-4f10-9edd-573886de26e7",
+      "displayName": "Sagar Maharnavar",
+      "userPrincipalName": "sagar.mah@cloudfuze.com",
+      "mail": "sagar.mah@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "8542483f-d1e6-4a9f-96e9-415fd521ae1d",
+      "displayName": "Raj",
+      "userPrincipalName": "BhimaRaju.Patsamatla@cloudfuze.com",
+      "mail": "BhimaRaju.Patsamatla@cloudfuze.com",
+      "jobTitle": "Account Manager"
+    },
+    {
+      "id": "86d5859b-f6d5-47a9-bfac-81a1d5a18725",
+      "displayName": "Suraj Kumar",
+      "userPrincipalName": "suraj.kumar@cloudfuze.com",
+      "mail": "suraj.kumar@cloudfuze.com",
+      "jobTitle": "Jr. Java Developer"
+    },
+    {
+      "id": "8719d31a-7211-4d71-a61a-21ad739a3516",
+      "displayName": "Olivia Thompson",
+      "userPrincipalName": "olivia@cloudfuze.com",
+      "mail": "olivia@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "87f39490-d6b9-4c00-ad5c-4141769fb1ce",
+      "displayName": "Contracts CloudFuze",
+      "userPrincipalName": "contracts@cloudfuze.com",
+      "mail": "contracts@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "88607026-562b-4192-ba81-855631de3948",
+      "displayName": "Davidraj",
+      "userPrincipalName": "Davidraj.Dumpala@cloudfuze.com",
+      "mail": "Davidraj.Dumpala@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "88c88468-cff4-4ce3-a1eb-60f3f8d55073",
+      "displayName": "Sai Raj",
+      "userPrincipalName": "SaiRaj.Kanigicharla@cloudfuze.com",
+      "mail": "SaiRaj.Kanigicharla@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "8902ba27-82bd-40cb-be1d-bdcbe34bf338",
+      "displayName": "John",
+      "userPrincipalName": "john@cloudfuze.com",
+      "mail": "john@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "8aeafc79-60c2-4cba-8059-11a213b238cd",
+      "displayName": "Ramesh Pydi",
+      "userPrincipalName": "ramesh.pydi@cloudfuze.com",
+      "mail": "ramesh.pydi@cloudfuze.com",
+      "jobTitle": "Java Consultant"
+    },
+    {
+      "id": "8cd91a1b-cec0-4630-8da0-d8802e4affc1",
+      "displayName": "Himansu Malla",
+      "userPrincipalName": "Himansu.Malla@cloudfuze.com",
+      "mail": "Himansu.Malla@cloudfuze.com",
+      "jobTitle": "Director- Customer Success"
+    },
+    {
+      "id": "8d23a571-d0e3-4bb9-80cb-a288478e4a4c",
+      "displayName": "Preethi John",
+      "userPrincipalName": "Preethi.John@cloudfuze.com",
+      "mail": "Preethi.John@cloudfuze.com",
+      "jobTitle": "Business Development Representative"
+    },
+    {
+      "id": "8dd92438-ca87-442e-a297-6b39654d7352",
+      "displayName": "Michelle Davis",
+      "userPrincipalName": "michelle@cloudfuze.com",
+      "mail": "michelle@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "8fa89738-209f-4ae7-a398-1ec1f59a0c7e",
+      "displayName": "Claudio Castro",
+      "userPrincipalName": "Claudio.Castro@cloudfuze.com",
+      "mail": "Claudio.Castro@cloudfuze.com",
+      "jobTitle": "Enterprise Sales"
+    },
+    {
+      "id": "91a36e57-8c48-4161-85a7-f656dbaf2d19",
+      "displayName": "Tharun P",
+      "userPrincipalName": "Tharun.Pothi@cloudfuze.com",
+      "mail": "Tharun.Pothi@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "928a0629-a3ef-4e74-9dd0-0c9b4870381c",
+      "displayName": "CloudFuze Deployments",
+      "userPrincipalName": "deployments@cloudfuze.com",
+      "mail": "deployments@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "928d7124-8b34-4b31-8c1f-50fbb424dcd9",
+      "displayName": "Zoho Projects QOS",
+      "userPrincipalName": "zp-qos@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000183149@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "92bd8581-5bed-4676-ab75-f33910d31766",
+      "displayName": "Lalitha",
+      "userPrincipalName": "lalitha@cloudfuze.com",
+      "mail": "lalitha@cloudfuze.com",
+      "jobTitle": "Migration Manager"
+    },
+    {
+      "id": "946ddb6f-949e-4888-b106-41beff6ba3b3",
+      "displayName": "Ravi Hemanth",
+      "userPrincipalName": "Ravi.Hemanth@cloudfuze.com",
+      "mail": "Ravi.Hemanth@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "94849f12-c99b-4314-a5d9-f92d27b7187e",
+      "displayName": "Adi Nandyala",
+      "userPrincipalName": "adi.nandyala@cloudfuze.com",
+      "mail": "adi.nandyala@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "96331ec1-4eb4-42fb-a635-a58f879aa799",
+      "displayName": "Kartik Kashyap",
+      "userPrincipalName": "Kartik.Kashyap@cloudfuze.com",
+      "mail": "Kartik.Kashyap@cloudfuze.com",
+      "jobTitle": "Senior Account Manager"
+    },
+    {
+      "id": "96403149-0427-4438-8be5-586f617bfce6",
+      "displayName": "Rajesh Xavier",
+      "userPrincipalName": "Rajesh.Xavier@cloudfuze.com",
+      "mail": "Rajesh.Xavier@cloudfuze.com",
+      "jobTitle": "Enterprise Account Manager"
+    },
+    {
+      "id": "9652fc98-6dcc-45b0-8ae8-1d46f6149578",
+      "displayName": "Mallesh",
+      "userPrincipalName": "Mallesh.Pothina@cloudfuze.com",
+      "mail": "Mallesh.Pothina@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "972907e7-2275-41a4-80c5-26e781acdb1a",
+      "displayName": "Old Employees",
+      "userPrincipalName": "oldemployee@cloudfuze.com",
+      "mail": "oldemployee@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "97baa227-4787-4c68-a4ca-c5573081083c",
+      "displayName": "Vijendar",
+      "userPrincipalName": "Vijendar.Burgula@cloudfuze.com",
+      "mail": "Vijendar.Burgula@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "98c07248-230e-48ee-ba2b-7e69fa23a5e3",
+      "displayName": "Simran",
+      "userPrincipalName": "simran@cloudfuze.com",
+      "mail": "simran@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "9aa3ac51-64cd-45f4-a756-30a02a980a65",
+      "displayName": "Pallavi K",
+      "userPrincipalName": "Pallavi.Kosuvaripalli@cloudfuze.com",
+      "mail": "Pallavi.Kosuvaripalli@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "9b110dcc-b6c3-437c-92fc-65d31457b0dd",
+      "displayName": "Pooja Parmar",
+      "userPrincipalName": "pooja.parmar@cloudfuze.com",
+      "mail": "pooja.parmar@cloudfuze.com",
+      "jobTitle": "Senior HR"
+    },
+    {
+      "id": "9c022127-f53e-4c5b-8655-19b91a7749ae",
+      "displayName": "kumar",
+      "userPrincipalName": "kumar@cloudfuze.com",
+      "mail": "kumar@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "9e908ffc-9096-40db-8eab-5b1a6c1cdff1",
+      "displayName": "Pavan Dutt",
+      "userPrincipalName": "pavandutt@cloudfuze.com",
+      "mail": "pavandutt@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "9ef5344d-cb6d-4c56-80ee-7269790cba9f",
+      "displayName": "Tanneeru Daniyelu",
+      "userPrincipalName": "tanneeru.daniyelu@cloudfuze.com",
+      "mail": "tanneeru.daniyelu@cloudfuze.com",
+      "jobTitle": "Java Developer"
+    },
+    {
+      "id": "9f1984c1-9fe5-484c-a1cf-5a0c6ab392f0",
+      "displayName": "Pankaj Rai",
+      "userPrincipalName": "pankaj.rai@cloudfuze.com",
+      "mail": "pankaj.rai@cloudfuze.com",
+      "jobTitle": "Senior Content Marketer"
+    },
+    {
+      "id": "a02b25b8-5231-4322-8c22-f679d33d2ca4",
+      "displayName": "Jenkins",
+      "userPrincipalName": "jenkins@cloudfuze.com",
+      "mail": "jenkins@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "a0ca5a39-1e39-4177-8e7d-9b43660fd4e9",
+      "displayName": "Venu Gurrapu",
+      "userPrincipalName": "venu.gurrapu@cloudfuze.com",
+      "mail": "venu.gurrapu@cloudfuze.com",
+      "jobTitle": "IT Recruiter "
+    },
+    {
+      "id": "a17ca5e9-c3b0-4e51-9a29-b861068011f3",
+      "displayName": "Bikau",
+      "userPrincipalName": "bikau@cloudfuze.com",
+      "mail": "bikau@cloudfuze.com",
+      "jobTitle": "Cloud Migration Engineer"
+    },
+    {
+      "id": "a1d6b86d-1084-4c87-9af6-972e7fad520c",
+      "displayName": "Abhinandan Kumar",
+      "userPrincipalName": "abhinandan.kumar@cloudfuze.com",
+      "mail": "abhinandan.kumar@cloudfuze.com",
+      "jobTitle": "Trainee Software Engineer"
+    },
+    {
+      "id": "a2729ca6-21a5-4805-ab7b-8e1e0246c94c",
+      "displayName": "Harshith Kaduluri",
+      "userPrincipalName": "harshith.kaduluri@cloudfuze.com",
+      "mail": "harshith.kaduluri@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "a396df86-191a-4f86-9583-902fa8749c80",
+      "displayName": "Accounts Payable",
+      "userPrincipalName": "accounts.receivable@cloudfuze.com",
+      "mail": "accounts.receivable@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "a3d200c3-2c22-41a3-b1b5-88e6ba72a87d",
+      "displayName": "Shaikh Adnan",
+      "userPrincipalName": "adnan@cloudfuze.com",
+      "mail": "adnan@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "a4efc284-d156-4794-9af1-8fd59ea3a17e",
+      "displayName": "Varsha",
+      "userPrincipalName": "Varsha.Nallashami@cloudfuze.com",
+      "mail": "Varsha.Nallashami@cloudfuze.com",
+      "jobTitle": "Business Operations Executive"
+    },
+    {
+      "id": "a68255cc-c808-4569-b0ee-7c34d8ac2dcd",
+      "displayName": "Bailey Johnson",
+      "userPrincipalName": "bailey.johnson@cloudfuze.com",
+      "mail": "bailey.johnson@cloudfuze.com",
+      "jobTitle": "Sales Manager"
+    },
+    {
+      "id": "a68b027a-23f2-485a-8e67-7adc66ab00c8",
+      "displayName": "CloudFuze Agreements",
+      "userPrincipalName": "agreements@cloudfuze.com",
+      "mail": "agreements@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "a8bc9e66-bb79-441c-abac-5a7fe93232e8",
+      "displayName": "Sohail Shaikh",
+      "userPrincipalName": "sohail.shaikh@cloudfuze.com",
+      "mail": "sohail.shaikh@cloudfuze.com",
+      "jobTitle": "Cloud Migration Engineer"
+    },
+    {
+      "id": "a9892cf8-7328-4ed6-945f-19eb4eece4e5",
+      "displayName": "Bharat Singadi",
+      "userPrincipalName": "Bharath.Singadi@cloudfuze.com",
+      "mail": "Bharath.Singadi@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "aaf73630-3711-40db-9736-44be434a440c",
+      "displayName": "Deepak R J",
+      "userPrincipalName": "Deepak.Rj@cloudfuze.com",
+      "mail": "Deepak.Rj@cloudfuze.com",
+      "jobTitle": "Account Manager"
+    },
+    {
+      "id": "ab0dcdc3-eb90-4f3a-8c4f-433207a3b462",
+      "displayName": "Vamshi Thammanaboina",
+      "userPrincipalName": "Vamshi.Thammanaboina@cloudfuze.com",
+      "mail": "Vamshi.Thammanaboina@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "ab2b96f4-405d-4933-81ae-73e011d2b66b",
+      "displayName": "Craig Fernandez",
+      "userPrincipalName": "Craig.Fernandez@cloudfuze.com",
+      "mail": "Craig.Fernandez@cloudfuze.com",
+      "jobTitle": "Senior BDR"
+    },
+    {
+      "id": "ab7f12b6-75d1-4812-b416-1679c7fe85c6",
+      "displayName": "Chaitanya Malle",
+      "userPrincipalName": "Chaitanya.Malle@cloudfuze.com",
+      "mail": "Chaitanya.Malle@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "ab9073ca-e645-4018-9ea8-e6fc475781ba",
+      "displayName": "Charles Stiltner",
+      "userPrincipalName": "Charles.Stiltner@cloudfuze.com",
+      "mail": "Charles.Stiltner@cloudfuze.com",
+      "jobTitle": "Enterprise sales representative"
+    },
+    {
+      "id": "ac2b9225-bfba-406a-ac47-404dc849d938",
+      "displayName": "Vaidehi Bingi",
+      "userPrincipalName": "vaidehi@cloudfuze.com",
+      "mail": "vaidehi@cloudfuze.com",
+      "jobTitle": "QA Engineer"
+    },
+    {
+      "id": "ac38f061-c2d9-45ec-a668-9cdff66c6463",
+      "displayName": "CloudFuze Sandbox Dropbox",
+      "userPrincipalName": "sandbox.dropbox@cloudfuze.com",
+      "mail": "sandbox.dropbox@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "acd7ced4-f678-4a54-95e2-ada9525d3459",
+      "displayName": "Sarah Wallace's",
+      "userPrincipalName": "sarah.wallace@cloudfuze.com",
+      "mail": "sarah.wallace@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "ad7af589-6aba-416a-acf3-7d89a4c55b14",
+      "displayName": "Vicky Cariappa",
+      "userPrincipalName": "vicky.cariappa@cloudfuze.com",
+      "mail": "vicky.cariappa@cloudfuze.com",
+      "jobTitle": "Account Manager"
+    },
+    {
+      "id": "adff3127-2b4f-405f-a203-f78868b6bf2f",
+      "displayName": "Samanta Bhoi",
+      "userPrincipalName": "samanta.bhoi@cloudfuze.com",
+      "mail": "samanta.bhoi@cloudfuze.com",
+      "jobTitle": "Senior software Engineer."
+    },
+    {
+      "id": "ae436817-53db-4523-b59d-14dcd269c779",
+      "displayName": "Dhatrika Sumanth",
+      "userPrincipalName": "SumanthD@cloudfuze.com",
+      "mail": "SumanthD@cloudfuze.com",
+      "jobTitle": "Business Development Representative"
+    },
+    {
+      "id": "b00cd089-82cc-4bc9-bf89-29faf7427f00",
+      "displayName": "Raj Narla",
+      "userPrincipalName": "Raj.Narla@cloudfuze.com",
+      "mail": "Raj.Narla@cloudfuze.com",
+      "jobTitle": "Consultant"
+    },
+    {
+      "id": "b0aac207-121e-42d1-86ab-dd9fd78cbeb9",
+      "displayName": "Zoho Projects Product Knowledge",
+      "userPrincipalName": "zp-product@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000232146@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "b0adf57d-950a-44bf-a997-f1741fd4b70c",
+      "displayName": "Prudhvi Booka",
+      "userPrincipalName": "Prudhvi.Booka@cloudfuze.com",
+      "mail": "Prudhvi.Booka@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "b0b730c4-5056-4257-835f-c00b881bf43b",
+      "displayName": "Roopa Y",
+      "userPrincipalName": "Roopa.Yerrabothu@cloudfuze.com",
+      "mail": "Roopa.Yerrabothu@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "b15b86db-e763-4ef9-8d9f-fb5ea0670b63",
+      "displayName": "Madhu Goddati",
+      "userPrincipalName": "Madhu.Goddati@cloudfuze.com",
+      "mail": "Madhu.Goddati@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "b2155163-f76c-48bf-8e51-187c1ce81d44",
+      "displayName": "Sales Hub",
+      "userPrincipalName": "sales.hub@cloudfuze.com",
+      "mail": "sales.hub@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "b349e179-8c70-494d-9927-7bac028cdd0a",
+      "displayName": "Chaitanya Gupta",
+      "userPrincipalName": "Chaitanya.Gupta@cloudfuze.com",
+      "mail": "Chaitanya.Gupta@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "b36c7d3b-f7f0-4204-a0f6-75aae45db261",
+      "displayName": "NagaLakshmi Mangina",
+      "userPrincipalName": "nagalakshmi.mangina@cloudfuze.com",
+      "mail": "nagalakshmi.mangina@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "b39f05e3-3eab-4ef3-bcf1-43b206173d5d",
+      "displayName": "Sai Prasad",
+      "userPrincipalName": "Sai.Prasad@cloudfuze.com",
+      "mail": "Sai.Prasad@cloudfuze.com",
+      "jobTitle": "VP of Sales"
+    },
+    {
+      "id": "b57644cd-8426-465c-bbe2-10bd5e9bd50a",
+      "displayName": "Nishath Begum",
+      "userPrincipalName": "nishath.begum@cloudfuze.com",
+      "mail": "nishath.begum@cloudfuze.com",
+      "jobTitle": "Cloud Migration Engineer"
+    },
+    {
+      "id": "b657ce2a-5fd5-4b9c-a839-8c76c510f6cd",
+      "displayName": "Sagar Patil",
+      "userPrincipalName": "sagar.patil@cloudfuze.com",
+      "mail": "sagar.patil@cloudfuze.com",
+      "jobTitle": "Customer Success Analyst"
+    },
+    {
+      "id": "b8fa6d72-3a0a-4dc5-ae0f-2ce66b34b9e5",
+      "displayName": "Sanjana Khanapur",
+      "userPrincipalName": "Sanjana.Khanapur@cloudfuze.com",
+      "mail": "Sanjana.Khanapur@cloudfuze.com",
+      "jobTitle": "Sales Operations Analyst"
+    },
+    {
+      "id": "bb2ef5f1-cab2-46c4-9a04-5134520daa9f",
+      "displayName": "Narayana Reddy",
+      "userPrincipalName": "Narayana.Reddy@cloudfuze.com",
+      "mail": "Narayana.Reddy@cloudfuze.com",
+      "jobTitle": "SEO Executive"
+    },
+    {
+      "id": "bb3c7334-50e5-4149-9870-b509dc8c8f07",
+      "displayName": "Sankar Chandu",
+      "userPrincipalName": "chandu.sankar@cloudfuze.com",
+      "mail": "chandu.sankar@cloudfuze.com",
+      "jobTitle": "Jr. DevOps System Engineer"
+    },
+    {
+      "id": "bbbe8a81-414c-4c91-9e42-ecdd9081be95",
+      "displayName": "Yogi",
+      "userPrincipalName": "Yogesh.vig@cloudfuze.com",
+      "mail": "Yogesh.vig@cloudfuze.com",
+      "jobTitle": "Senior Account Manager"
+    },
+    {
+      "id": "bc1ce3d7-382c-43d7-bc25-912f6ec86335",
+      "displayName": "Devin Gordon",
+      "userPrincipalName": "Devin.Gordon@cloudfuze.com",
+      "mail": "Devin.Gordon@cloudfuze.com",
+      "jobTitle": "senior enterprise account manager"
+    },
+    {
+      "id": "bc5b67e4-71f2-4c6f-9097-3e5833b051c9",
+      "displayName": "Shanmukha",
+      "userPrincipalName": "Shanmukha.Agnihotram@cloudfuze.com",
+      "mail": "Shanmukha.Agnihotram@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "bca5c426-147e-47ff-bc82-0c0a42ac05c4",
+      "displayName": "Aayushi",
+      "userPrincipalName": "aayushi@cloudfuze.com",
+      "mail": "aayushi@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "bcca548f-b9cf-426f-bc86-207ba210c2ae",
+      "displayName": "Habeebunnisa Begum",
+      "userPrincipalName": "Habeebunnisa.Begum@cloudfuze.com",
+      "mail": "Habeebunnisa.Begum@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "bd9d2125-53ae-4400-bc1a-26b246168106",
+      "displayName": "Alamuru Ramana Reddy",
+      "userPrincipalName": "Ramana.Reddy@cloudfuze.com",
+      "mail": "Ramana.Reddy@cloudfuze.com",
+      "jobTitle": "IT support engineer"
+    },
+    {
+      "id": "bdc7f30c-451e-4172-b5e9-4bef17d99cc8",
+      "displayName": "Test Mail",
+      "userPrincipalName": "test@cloudfuze.com",
+      "mail": "test@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "be9b6e7d-a9e1-433f-8a12-4b3c7ea28738",
+      "displayName": "Manisha Verma",
+      "userPrincipalName": "manisha.verma@cloudfuze.com",
+      "mail": "manisha.verma@cloudfuze.com",
+      "jobTitle": "Junior Migration Engineer"
+    },
+    {
+      "id": "bee7b391-dbb6-47cd-a51d-8694ab2d567a",
+      "displayName": "Pavan Bhagavathula",
+      "userPrincipalName": "pavan@cloudfuze.com",
+      "mail": "pavan@cloudfuze.com",
+      "jobTitle": "Senior Infra Admin"
+    },
+    {
+      "id": "bf858aef-4126-479f-976d-c35ea0117ef8",
+      "displayName": "CloudFuze SaaS Account",
+      "userPrincipalName": "saas@cloudfuze.com",
+      "mail": "saas@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "c08ce4f8-e72a-4c95-b94b-b5629cc30e66",
+      "displayName": "Madhuri",
+      "userPrincipalName": "Madhuri.Yeleswarapu@cloudfuze.com",
+      "mail": "Madhuri.Yeleswarapu@cloudfuze.com",
+      "jobTitle": "Senior HR Manager"
+    },
+    {
+      "id": "c1dd557b-3e8f-4a11-906e-35d6498b95d7",
+      "displayName": "Harsha Thakre",
+      "userPrincipalName": "harsha.thakre@cloudfuze.com",
+      "mail": "harsha.thakre@cloudfuze.com",
+      "jobTitle": "Junior Migration Engineer"
+    },
+    {
+      "id": "c1f43c11-be25-427f-bbad-9f14817c311d",
+      "displayName": "Praveen Kothagolla",
+      "userPrincipalName": "Praveen.Kothagolla@cloudfuze.com",
+      "mail": "Praveen.Kothagolla@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "c2a41098-5703-49ed-8051-3dcdc02857a2",
+      "displayName": "Zoho Projects Sales",
+      "userPrincipalName": "zp-sales@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000186097@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "c3ba793c-53d3-4c2c-be4c-441fa48d40b5",
+      "displayName": "Dhruva K R",
+      "userPrincipalName": "Dhruva@cloudfuze.com",
+      "mail": "Dhruva@cloudfuze.com",
+      "jobTitle": "Account Manager"
+    },
+    {
+      "id": "c5115087-cbc1-45f6-bcb4-0d7344f10c8a",
+      "displayName": "Nikhil Patel",
+      "userPrincipalName": "nikhil@cloudfuze.com",
+      "mail": "nikhil@cloudfuze.com",
+      "jobTitle": "Migration Manager"
+    },
+    {
+      "id": "c6e7318e-b025-4c11-8f2c-4f2a56d67e12",
+      "displayName": "Shivani Banda",
+      "userPrincipalName": "shivani.banda@cloudfuze.com",
+      "mail": "shivani.banda@cloudfuze.com",
+      "jobTitle": "Trainee QA Engineer"
+    },
+    {
+      "id": "c7a8cba6-5aa7-442d-aec8-d4071eca905c",
+      "displayName": "Sai",
+      "userPrincipalName": "sai.pedaparti@cloudfuze.com",
+      "mail": "sai.pedaparti@cloudfuze.com",
+      "jobTitle": "Sr. Channel Account Manager"
+    },
+    {
+      "id": "c7c2af70-1f22-4b90-aaca-2c300b6980ac",
+      "displayName": "dpo",
+      "userPrincipalName": "dpo1@cloudfuze.com",
+      "mail": null,
+      "jobTitle": null
+    },
+    {
+      "id": "ca2de03b-77f3-473e-a3c0-41fdc59c40e0",
+      "displayName": "Jyoshitha Dhannapaneni",
+      "userPrincipalName": "Jyoshitha.Dhannapaneni@cloudfuze.com",
+      "mail": "Jyoshitha.Dhannapaneni@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "cb66b4ea-7b11-4570-89f3-a6b889da0f55",
+      "displayName": "Santosh Chintalapelli",
+      "userPrincipalName": "santosh@cloudfuze.com",
+      "mail": "santosh@cloudfuze.com",
+      "jobTitle": "Senior Software Engineer"
+    },
+    {
+      "id": "cb6abb31-12cd-47ce-991e-782c43c786e5",
+      "displayName": "Ravi Yemmineni",
+      "userPrincipalName": "raviy@cloudfuze.com",
+      "mail": "raviy@cloudfuze.com",
+      "jobTitle": "Product Owner"
+    },
+    {
+      "id": "cb733efa-0884-41b0-81ff-b62857b6018b",
+      "displayName": "Gopi Krishna",
+      "userPrincipalName": "gopi@cloudfuze.com",
+      "mail": "gopi@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "cbe86800-7c10-449d-88d5-88b60f661fdd",
+      "displayName": "Akib Mohd",
+      "userPrincipalName": "Akib.Mohd@cloudfuze.com",
+      "mail": "Akib.Mohd@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "cc5fa010-63cd-472e-995f-2ff503fd15d5",
+      "displayName": "Hrushikesh",
+      "userPrincipalName": "Hrushikesh.Sholapure@cloudfuze.com",
+      "mail": "Hrushikesh.Sholapure@cloudfuze.com",
+      "jobTitle": "Business Development Representative"
+    },
+    {
+      "id": "ccf2f90c-10d1-42d0-aa1c-a244b4753375",
+      "displayName": "Bhavani Nimmala",
+      "userPrincipalName": "Bhavani.Nimmala@cloudfuze.com",
+      "mail": "Bhavani.Nimmala@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "ce37a9da-b9c6-497d-9bb0-1891ed454b70",
+      "displayName": "Shruti Jadhav",
+      "userPrincipalName": "shruti.jadhav@cloudfuze.com",
+      "mail": "shruti.jadhav@cloudfuze.com",
+      "jobTitle": "Trainee Software Engineer"
+    },
+    {
+      "id": "cf6042da-1b79-4c44-bec9-1fcbe6174bdf",
+      "displayName": "Garima Patel",
+      "userPrincipalName": "garima.patel@cloudfuze.com",
+      "mail": "garima.patel@cloudfuze.com",
+      "jobTitle": "Business Development Representative"
+    },
+    {
+      "id": "d06d5b5a-d508-44ee-a44a-5ee9201982b2",
+      "displayName": "Harini Elangovan",
+      "userPrincipalName": "Harini.Elangovan@cloudfuze.com",
+      "mail": "Harini.Elangovan@cloudfuze.com",
+      "jobTitle": "Sales Operations Manager"
+    },
+    {
+      "id": "d11c13de-f891-456e-9852-349cec4c3dac",
+      "displayName": "Rahul Balijapally",
+      "userPrincipalName": "Rahul.Balijapally@cloudfuze.com",
+      "mail": "Rahul.Balijapally@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "d145f08d-e601-43d3-9718-11fd2255263c",
+      "displayName": "Asma Karim",
+      "userPrincipalName": "Asma.Karim@cloudfuze.com",
+      "mail": "Asma.Karim@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "d3871ba4-730e-42f6-8dd3-dd059d0504c6",
+      "displayName": "Rajesh Xavier",
+      "userPrincipalName": "RajeshXavier@cloudfuze.com",
+      "mail": "RajeshXavier@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "d3d66c6b-1149-47bf-b9a2-fd43360b3097",
+      "displayName": "Meena Lakshmi Triveni",
+      "userPrincipalName": "Meena.Lakshmi@cloudfuze.com",
+      "mail": "Meena.Lakshmi@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "d4429950-094d-460f-8841-2fbe278ce6a6",
+      "displayName": "Arun Kandula",
+      "userPrincipalName": "Arun@cloudfuze.com",
+      "mail": "Arun@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "d49484f3-b83d-41ee-97e8-0b7955137817",
+      "displayName": "Ankit Mishra",
+      "userPrincipalName": "ankit@cloudfuze.com",
+      "mail": "ankit@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "d4a7ea86-937b-4eff-8c62-8d614b7fc537",
+      "displayName": "Bhanu Prakash",
+      "userPrincipalName": "bhanuprakash.pavuluri@cloudfuze.com",
+      "mail": "bhanuprakash.pavuluri@cloudfuze.com",
+      "jobTitle": "Junior System Engineer-DevOps"
+    },
+    {
+      "id": "d6170bfe-8e3a-4ae9-bc17-49f3c7f5af26",
+      "displayName": "Soniya P",
+      "userPrincipalName": "Soniya.Paladugula@cloudfuze.com",
+      "mail": "Soniya.Paladugula@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "d68048a0-625f-4da4-9e53-fd7aae73e555",
+      "displayName": "Royston Aden",
+      "userPrincipalName": "Royston.Aden@cloudfuze.com",
+      "mail": "Royston.Aden@cloudfuze.com",
+      "jobTitle": " Account Manager"
+    },
+    {
+      "id": "d73145f7-c631-441c-8472-44a82fcf3eb4",
+      "displayName": "Sai kumar",
+      "userPrincipalName": "Saikumar.Kustapuram@cloudfuze.com",
+      "mail": "Saikumar.Kustapuram@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "d732af57-52fb-4ff4-b4ac-e2a7923b601b",
+      "displayName": "Dathu Kaluvala",
+      "userPrincipalName": "Dathu.Kaluvala@cloudfuze.com",
+      "mail": "Dathu.Kaluvala@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "d73b02d0-3794-4e4b-8b70-7760285fc3f5",
+      "displayName": "CloudFuze Postmaster",
+      "userPrincipalName": "postmaster@cloudfuze.com",
+      "mail": "postmaster@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "d7bd7f78-ba23-411d-8488-707594332bf3",
+      "displayName": "Sujana Manapuram",
+      "userPrincipalName": "Sujana.Manapuram@cloudfuze.com",
+      "mail": "Sujana.Manapuram@cloudfuze.com",
+      "jobTitle": "Associate HRBP"
+    },
+    {
+      "id": "d8c1e06d-3823-46af-bb89-6c32bf2521af",
+      "displayName": "Prasad Annabathula",
+      "userPrincipalName": "prasad@cloudfuze.com",
+      "mail": "prasad@cloudfuze.com",
+      "jobTitle": "Solution Architect"
+    },
+    {
+      "id": "d8ea62cb-67bf-4ccd-8120-ed6540503c52",
+      "displayName": "Adapa Tarun Kumar",
+      "userPrincipalName": "Tarun.Kumar@cloudfuze.com",
+      "mail": "Tarun.Kumar@cloudfuze.com",
+      "jobTitle": "Trainee SEO Executive"
+    },
+    {
+      "id": "d8f9f941-be3c-4939-9273-984f95a47bd1",
+      "displayName": "Harshitha Rao",
+      "userPrincipalName": "harshitha.rao@cloudfuze.com",
+      "mail": "harshitha.rao@cloudfuze.com",
+      "jobTitle": "Business Analyst"
+    },
+    {
+      "id": "d8fbbb1d-c266-4a3b-979c-b58c05159573",
+      "displayName": "Soumya G",
+      "userPrincipalName": "Soumya.Gande@cloudfuze.com",
+      "mail": "Soumya.Gande@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "d9010d09-d875-40cc-844e-08fc160d0cd9",
+      "displayName": "Ajay Singh",
+      "userPrincipalName": "ajay.singh@cloudfuze.com",
+      "mail": "ajay.singh@cloudfuze.com",
+      "jobTitle": "Migration Manager"
+    },
+    {
+      "id": "d90995bd-041e-42da-895f-d452a68a7c41",
+      "displayName": "Punitha Philip",
+      "userPrincipalName": "Punitha.Philip@cloudfuze.com",
+      "mail": "Punitha.Philip@cloudfuze.com",
+      "jobTitle": "Technical Content Writer"
+    },
+    {
+      "id": "d95448d3-7341-4746-aae9-eb9ac470d75f",
+      "displayName": "Nick",
+      "userPrincipalName": "nick@cloudfuze.com",
+      "mail": "nick@cloudfuze.com",
+      "jobTitle": "Business Development Manager"
+    },
+    {
+      "id": "d9e47774-3fbb-40b7-be9f-a0e59f65c036",
+      "displayName": "Kevin Anto",
+      "userPrincipalName": "Kevin.Anto@cloudfuze.com",
+      "mail": "Kevin.Anto@cloudfuze.com",
+      "jobTitle": "Business Development Representative"
+    },
+    {
+      "id": "da093f68-7d5d-42bf-a6ab-316f81c11af8",
+      "displayName": "Zoho Projects CF BackLogs",
+      "userPrincipalName": "zp-backlogs@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000244005@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "da49df04-ccf2-4146-94ff-1ed02d7bb824",
+      "displayName": "Zoho Projects QA",
+      "userPrincipalName": "zp-qa@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000183177@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "da930913-c8e3-4c73-99a0-0cf97e06f805",
+      "displayName": "Swaroop",
+      "userPrincipalName": "swaroop@cloudfuze.com",
+      "mail": "swaroop@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "db11b288-26b6-43e4-bfed-d42b874e5038",
+      "displayName": "Manish Singh",
+      "userPrincipalName": "manish.singh@cloudfuze.com",
+      "mail": "manish.singh@cloudfuze.com",
+      "jobTitle": "Sr. Channel Account Manager"
+    },
+    {
+      "id": "db5ad377-6ed2-4aa9-9226-0a829941a8da",
+      "displayName": "Raju Burnwal",
+      "userPrincipalName": "raju@cloudfuze.com",
+      "mail": "raju@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "db9a1aa0-a5c4-47ee-b8e3-2e5dc0bbe713",
+      "displayName": "CloudFuze Support",
+      "userPrincipalName": "support@cloudfuze.com",
+      "mail": "support@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "dc3ac1d4-5f8e-4ea5-846b-47ce6a0af46d",
+      "displayName": "Raviteja K",
+      "userPrincipalName": "Bala.Raviteja@cloudfuze.com",
+      "mail": "Bala.Raviteja@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "dc8b6443-a528-4817-b3b2-eefda9bda66e",
+      "displayName": "Abhinit Kumar",
+      "userPrincipalName": "abhinit@cloudfuze.com",
+      "mail": "abhinit@cloudfuze.com",
+      "jobTitle": "Technical Architect"
+    },
+    {
+      "id": "de92f24b-e248-4d40-87fb-531057d05486",
+      "displayName": "Abhishek",
+      "userPrincipalName": "Abhishek.Sakala@cloudfuze.com",
+      "mail": "Abhishek.Sakala@cloudfuze.com",
+      "jobTitle": "Migration Manager"
+    },
+    {
+      "id": "df124dd7-6025-4785-9192-a20e3dc8b4ab",
+      "displayName": "Nivas",
+      "userPrincipalName": "nivas@cloudfuze.com",
+      "mail": "nivas@cloudfuze.com",
+      "jobTitle": "QA Engineer"
+    },
+    {
+      "id": "df24ef4d-37f8-4919-99c5-1570bfd4bb18",
+      "displayName": "cliff",
+      "userPrincipalName": "cliff@cloudfuze.com",
+      "mail": "cliff@filefuze.co",
+      "jobTitle": null
+    },
+    {
+      "id": "dfb83c96-eb97-4409-9ee9-b3e272c4f418",
+      "displayName": "Shivam Singh",
+      "userPrincipalName": "Shivam.Singh@cloudfuze.com",
+      "mail": "Shivam.Singh@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "e0201445-13da-4e2e-80c6-3cd84a48e9b0",
+      "displayName": "CloudFuze Old Employees",
+      "userPrincipalName": "oldemployees@cloudfuze.com",
+      "mail": "oldemployees@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "e06c400d-07a6-4d8f-9286-dd6fb50ad324",
+      "displayName": "Arshiya Syed",
+      "userPrincipalName": "arshiya.syed@cloudfuze.com",
+      "mail": "arshiya.syed@cloudfuze.com",
+      "jobTitle": "Migration Engineer"
+    },
+    {
+      "id": "e0824684-ac0e-4272-9dec-dc63d03f2d46",
+      "displayName": "Hari Rowlo",
+      "userPrincipalName": "hari.rowlo@cloudfuze.com",
+      "mail": "hari.rowlo@cloudfuze.com",
+      "jobTitle": "Graphic Designer"
+    },
+    {
+      "id": "e0d2056f-5467-4095-91a8-8d72d227be77",
+      "displayName": "Kalyan Upputuri",
+      "userPrincipalName": "kalyan.upputuri@cloudfuze.com",
+      "mail": "kalyan.upputuri@cloudfuze.com",
+      "jobTitle": "Migration Engineer"
+    },
+    {
+      "id": "e1af8731-e66a-430e-8adb-0ae33458e3a4",
+      "displayName": "Anitha Madhuri",
+      "userPrincipalName": "anitha.madhuri@cloudfuze.com",
+      "mail": "anitha.madhuri@cloudfuze.com",
+      "jobTitle": "HR Manager"
+    },
+    {
+      "id": "e311746f-5b5b-476f-8a4b-bc5b72750d88",
+      "displayName": "Neelima Krotta",
+      "userPrincipalName": "neelima.krotta@cloudfuze.com",
+      "mail": "neelima.krotta@cloudfuze.com",
+      "jobTitle": "Migration Engineer"
+    },
+    {
+      "id": "e3663000-3eca-4877-b91b-17016ed42078",
+      "displayName": "Joy Prakash A",
+      "userPrincipalName": "Joy.Prakash@cloudfuze.com",
+      "mail": "Joy.Prakash@cloudfuze.com",
+      "jobTitle": "Senior Account Manager"
+    },
+    {
+      "id": "e435bcd1-c8b4-46c6-9798-fe6ae123d1dd",
+      "displayName": "Tejaswi Srigiri",
+      "userPrincipalName": "tejaswi.s@cloudfuze.com",
+      "mail": "tejaswi.s@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "e45205b8-0858-4088-8bf6-f0e2d77b1fa4",
+      "displayName": "Kenneth Carnes",
+      "userPrincipalName": "kenneth.carnes_hingepoint.com#EXT#@cloudfuze.com",
+      "mail": "kenneth.carnes@hingepoint.com",
+      "jobTitle": null
+    },
+    {
+      "id": "e5121c49-2c19-4ee3-ae22-7cda8e96383c",
+      "displayName": "Pranavi",
+      "userPrincipalName": "Pranavi@cloudfuze.com",
+      "mail": "Pranavi@cloudfuze.com",
+      "jobTitle": "Product Analyst"
+    },
+    {
+      "id": "e537d8ec-649b-41cd-83b2-df4314b8ac1f",
+      "displayName": "CloudFuze Accounts",
+      "userPrincipalName": "accounts@cloudfuze.com",
+      "mail": "accounts@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "e5693a72-5340-4f18-a949-83be9a7d8500",
+      "displayName": "Dev Kumar Mandal",
+      "userPrincipalName": "Dev.Kumar@cloudfuze.com",
+      "mail": "Dev.Kumar@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "e7cbd971-8f9b-40a0-a45b-7a1b813ffb43",
+      "displayName": "Bhuvana Mosra",
+      "userPrincipalName": "bhuvana.mosra@cloudfuze.com",
+      "mail": "bhuvana.mosra@cloudfuze.com",
+      "jobTitle": "QA Engineer "
+    },
+    {
+      "id": "e7db1e41-0dca-4b12-a6c1-480e382ecc62",
+      "displayName": "Vrushika Hanji",
+      "userPrincipalName": "Vrushika.Hanji@cloudfuze.com",
+      "mail": "Vrushika.Hanji@cloudfuze.com",
+      "jobTitle": "Associate BDR"
+    },
+    {
+      "id": "e98e3af6-80b5-42ef-97e2-cfe7635dba38",
+      "displayName": "Sadia Shaik",
+      "userPrincipalName": "sadia.shaik@cloudfuze.com",
+      "mail": "sadia.shaik@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "e9b0ac4c-29c0-477b-bc96-03d12dda26d4",
+      "displayName": "Srinu G",
+      "userPrincipalName": "Srinu.Gudimitla@cloudfuze.com",
+      "mail": "Srinu.Gudimitla@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "ea9b39ba-ce1e-4b60-89bf-205e977b1fd6",
+      "displayName": "Anusha B",
+      "userPrincipalName": "Anusha@cloudfuze.com",
+      "mail": "Anusha@cloudfuze.com",
+      "jobTitle": "BDR"
+    },
+    {
+      "id": "ebb9ef9e-fbaa-4849-a200-96925d288547",
+      "displayName": "Rahul Chettiyar",
+      "userPrincipalName": "rahul.chettiyar@cloudfuze.com",
+      "mail": "rahul.chettiyar@cloudfuze.com",
+      "jobTitle": "Junior Migration Engineer"
+    },
+    {
+      "id": "ec69f154-ed69-407f-b7f2-311719d5e961",
+      "displayName": "Kiran Ummenthala",
+      "userPrincipalName": "Kiran.Ummenthala@cloudfuze.com",
+      "mail": "Kiran.Ummenthala@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "ecd6925e-d871-4217-b784-de6390dd1d4c",
+      "displayName": "CFManage Support",
+      "userPrincipalName": "cfmanagesupport@cloudfuze.com",
+      "mail": "cfmanagesupport@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "ece41aed-5aa5-4319-a62a-b7c7a9ed0a8e",
+      "displayName": "Mastan Parvin",
+      "userPrincipalName": "Mastan.Parvin@cloudfuze.com",
+      "mail": "Mastan.Parvin@cloudfuze.com",
+      "jobTitle": "Technical Content Writer"
+    },
+    {
+      "id": "ece4630d-1076-4697-a7c1-bee663015f17",
+      "displayName": "Anush Dasari",
+      "userPrincipalName": "Anush.Dasari@cloudfuze.com",
+      "mail": "Anush.Dasari@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "ece528b4-1f44-4e23-9d82-f81f54993657",
+      "displayName": "Phani R",
+      "userPrincipalName": "Phani.Ryali@cloudfuze.com",
+      "mail": "Phani.Ryali@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "ed708493-8f71-4e5d-a500-176590a9fbf3",
+      "displayName": "Maheswari Aram",
+      "userPrincipalName": "maheswari.aram@cloudfuze.com",
+      "mail": "maheswari.aram@cloudfuze.com",
+      "jobTitle": "Junior Migration Manager"
+    },
+    {
+      "id": "eedfb00a-1959-4cb9-a1f5-f715c059efaa",
+      "displayName": "Madhulika Tiwari",
+      "userPrincipalName": "madhulika.tiwari@cloudfuze.com",
+      "mail": "madhulika.tiwari@cloudfuze.com",
+      "jobTitle": "Migration Engineer"
+    },
+    {
+      "id": "efbf1e03-f091-4837-a6e8-48ca3ec543d8",
+      "displayName": "bhanu prakash",
+      "userPrincipalName": "bhanu.prakash@cloudfuze.com",
+      "mail": null,
+      "jobTitle": null
+    },
+    {
+      "id": "f0845678-f530-412f-a30c-4509c98c8721",
+      "displayName": "Ashu Tiwary",
+      "userPrincipalName": "ashu.tiwary@cloudfuze.com",
+      "mail": "ashu.tiwary@cloudfuze.com",
+      "jobTitle": "Software Engineer"
+    },
+    {
+      "id": "f09c1fce-797d-4a9a-96a5-51efda687e60",
+      "displayName": "Akhilesh Kumar Yadav",
+      "userPrincipalName": "Akhilesh.Yadav@cloudfuze.com",
+      "mail": "Akhilesh.Yadav@cloudfuze.com",
+      "jobTitle": "Engineering Manager"
+    },
+    {
+      "id": "f2072b14-4f41-4915-9cd8-f67e2f59db63",
+      "displayName": "Security Alerts",
+      "userPrincipalName": "securityalerts@cloudfuze.com",
+      "mail": "securityalerts@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "f2f49d19-7b79-4561-8690-a81e44c8113c",
+      "displayName": "Raj Jannavarapu",
+      "userPrincipalName": "Raj.jannavarapu@cloudfuze.com",
+      "mail": "Raj.jannavarapu@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "f36e4c60-3996-4125-a533-fcf8b5a32b4d",
+      "displayName": "Amulya Anapuram",
+      "userPrincipalName": "Amulya.Anapuram@cloudfuze.com",
+      "mail": "Amulya.Anapuram@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "f399fe6a-b846-4963-b7d2-f8776d53cced",
+      "displayName": "Arpit Jain",
+      "userPrincipalName": "arpit.jain@cloudfuze.com",
+      "mail": "arpit.jain@cloudfuze.com",
+      "jobTitle": "Sr. Enterprise Account Manager"
+    },
+    {
+      "id": "f64f79b7-b3b2-4b9b-b8c7-2bc8cb6646d3",
+      "displayName": "Prakash S",
+      "userPrincipalName": "Prakash.Singampalli@cloudfuze.com",
+      "mail": "Prakash.Singampalli@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "f8357a82-6cee-4b52-9b65-313ca8972283",
+      "displayName": "JIRA",
+      "userPrincipalName": "jira@cloudfuze.com",
+      "mail": "jira@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "f945427d-ff43-44d5-8af0-72139f9dad74",
+      "displayName": "Apiconnect",
+      "userPrincipalName": "apiconnect@cloudfuze.com",
+      "mail": "apiconnect@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "f99963c2-670e-4371-8ce6-0b64a061b6cf",
+      "displayName": "Pre-Sales Demo/POC",
+      "userPrincipalName": "PreSalesDemoPOC@cloudfuze.com",
+      "mail": "PreSalesDemoPOC@cloudfuze.com",
+      "jobTitle": null
+    },
+    {
+      "id": "f9e391b6-55e1-497e-a6c7-3b063cee8529",
+      "displayName": "Bhanu Srikakulam",
+      "userPrincipalName": "Bhanu.Srikakulam@cloudfuze.com",
+      "mail": "Bhanu.Srikakulam@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "fa01b90b-c5a6-47cc-832a-4384f6a75f73",
+      "displayName": "Siva Kota",
+      "userPrincipalName": "Siva.Kota@cloudfuze.com",
+      "mail": "Siva.Kota@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "faa85988-fb3e-46e3-b92f-6060a9e71d38",
+      "displayName": "Lawrence Lewis",
+      "userPrincipalName": "lawrence.lewis@cloudfuze.com",
+      "mail": "lawrence.lewis@cloudfuze.com",
+      "jobTitle": "Sr. Enterprise Account Manager"
+    },
+    {
+      "id": "fc73ca78-8696-4d93-88b0-83f25388b7c2",
+      "displayName": "Ganesh Mannem",
+      "userPrincipalName": "Ganesh.Mannem@cloudfuze.com",
+      "mail": "Ganesh.Mannem@cloudfuze.com",
+      "jobTitle": "Trainee"
+    },
+    {
+      "id": "fdf449a9-ef32-4fc8-bfd1-76a1b4057878",
+      "displayName": "Zoho Projects Engineering",
+      "userPrincipalName": "zp-engg@cloudfuze.com",
+      "mail": "cloudfuze9693_1194688000000183005@tasks.zohoprojects.com",
+      "jobTitle": null
+    },
+    {
+      "id": "fe65144f-c698-41c6-a280-d818647e7bd3",
+      "displayName": "Chandan",
+      "userPrincipalName": "Chandan.B@cloudfuze.com",
+      "mail": "Chandan.B@cloudfuze.com",
+      "jobTitle": "Sales Operations Analyst"
+    },
+    {
+      "id": "ffb5c47c-facc-4f03-9946-a3c8798a7d2d",
+      "displayName": "Venkata Rahul",
+      "userPrincipalName": "venkata.rahul@cloudfuze.com",
+      "mail": "venkata.rahul@cloudfuze.com",
+      "jobTitle": "SEO Executive"
+    }
+  ]
+}

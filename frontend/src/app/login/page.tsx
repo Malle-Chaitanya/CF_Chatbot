@@ -20,6 +20,10 @@ export default function LoginPage() {
 
   return (
     <>
+      <Snowfall
+  snowflakeCount={150}
+  color="#CAE7FF"
+/>
       <header>
         <Image src="/images/CloudFuze Horizontal Logo.svg" alt="CloudFuze Logo" width={150} height={40} priority />
       </header>
@@ -494,4 +498,3 @@ function initializeLoginPage() {
   // Auth check is already handled in loadOAuthConfig().then() above
   // No need for duplicate checks on focus/load events
 }
-

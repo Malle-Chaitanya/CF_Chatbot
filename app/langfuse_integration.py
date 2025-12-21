@@ -5,7 +5,7 @@ Langfuse Integration for RAG Chatbot Observability
 This module handles logging all chat interactions to Langfuse for observability.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from langfuse import Langfuse
 from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
@@ -50,8 +50,8 @@ class LangfuseTracker:
             return None
         
         try:
-            # Build metadata
-            trace_metadata = {**(metadata or {}), "timestamp": datetime.now().isoformat()}
+            # Build metadata (using UTC for consistency)
+            trace_metadata = {**(metadata or {}), "timestamp": datetime.now(timezone.utc).isoformat()}
             
             trace = self.client.trace(
                 name="chat_interaction",
@@ -68,7 +68,7 @@ class LangfuseTracker:
                 model="gpt-4o-mini",
                 input=question,
                 output=answer,
-                metadata={"timestamp": datetime.now().isoformat()}
+                metadata={"timestamp": datetime.now(timezone.utc).isoformat()}
             )
             
             trace_id = trace.id
@@ -137,7 +137,7 @@ class LangfuseTracker:
                 name=name,
                 input=input_data,
                 output=output_data,
-                metadata={**(metadata or {}), "timestamp": datetime.now().isoformat()}
+                metadata={**(metadata or {}), "timestamp": datetime.now(timezone.utc).isoformat()}
             )
             return True
             
@@ -161,8 +161,8 @@ class LangfuseTracker:
             return None
         
         try:
-            # Build metadata
-            trace_metadata = {**(metadata or {}), "timestamp": datetime.now().isoformat()}
+            # Build metadata (using UTC for consistency)
+            trace_metadata = {**(metadata or {}), "timestamp": datetime.now(timezone.utc).isoformat()}
             
             trace = self.client.trace(
                 name="chat_interaction",
@@ -202,7 +202,7 @@ class RAGPipelineTrace:
             self.query_span = self.trace.span(
                 name="query",
                 input=enhanced_query,
-                metadata={**(metadata or {}), "timestamp": datetime.now().isoformat()}
+                metadata={**(metadata or {}), "timestamp": datetime.now(timezone.utc).isoformat()}
             )
             return self.query_span
         except Exception as e:
@@ -220,7 +220,7 @@ class RAGPipelineTrace:
                     **(metadata or {}),
                     "document_count": doc_count,
                     "sources_breakdown": sources_breakdown,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }
             )
             
@@ -228,7 +228,7 @@ class RAGPipelineTrace:
                 name="vectorstore_embedding",
                 input=query,
                 output=f"Embedded query and searched {doc_count} documents",
-                metadata={"embedding_model": "text-embedding-3-small", "timestamp": datetime.now().isoformat()}
+                metadata={"embedding_model": "text-embedding-3-small", "timestamp": datetime.now(timezone.utc).isoformat()}
             )
             
             return self.retrieve_span
@@ -243,7 +243,7 @@ class RAGPipelineTrace:
             self.synthesize_span = self.query_span.span(
                 name="synthesize",
                 input={"context_length": len(context)},
-                metadata={**(metadata or {}), "timestamp": datetime.now().isoformat()}
+                metadata={**(metadata or {}), "timestamp": datetime.now(timezone.utc).isoformat()}
             )
             return self.synthesize_span
             
@@ -259,7 +259,7 @@ class RAGPipelineTrace:
                 model=model,
                 input=prompt,
                 output=response,
-                metadata={**(metadata or {}), "timestamp": datetime.now().isoformat()}
+                metadata={**(metadata or {}), "timestamp": datetime.now(timezone.utc).isoformat()}
             )
         except Exception as e:
             print(f"[ERROR] LLM generation failed: {e}")
@@ -275,7 +275,7 @@ class RAGPipelineTrace:
                 metadata={
                     **(metadata or {}),
                     "response_length": len(final_response),
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }
             )
         except Exception as e:

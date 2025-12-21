@@ -214,3 +214,9 @@ The fix is simple: Use BOTH sessionStorage AND localStorage instead of just one.
 
 For more details, see the full documentation files listed above.
 
+
+
+
+
+
+

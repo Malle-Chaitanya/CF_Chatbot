@@ -536,3 +536,9 @@ console.log('Current URL:', window.location.href);
 
 Share the output when asking for help!
 
+
+
+
+
+
+
