@@ -54,6 +54,7 @@ export async function apiFetch(
     credentials: 'include', // ⭐ CRITICAL: Always include cookies
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json', // ⭐ Ensure nginx routes API requests to backend
       ...options.headers,
     },
   });
