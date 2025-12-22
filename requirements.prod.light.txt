@@ -21,9 +21,6 @@ langchain-chroma==1.0.0
 openai>=1.109.1
 langfuse==2.51.2
 
-google-generativeai>=0.3.0 
-langchain-google-genai>=0.1.0 
-
 # Vector Database (for loading pre-built vectorstore)
 chromadb>=1.0.20
 
@@ -81,3 +78,5 @@ rank-bm25==0.2.2
 # - webdriver-manager==4.0.2           # ChromeDriver management
 # - xlrd==2.0.1                        # Old Excel format support
 
+google-generativeai>=0.3.0
+langchain-google-genai>=0.1.0
