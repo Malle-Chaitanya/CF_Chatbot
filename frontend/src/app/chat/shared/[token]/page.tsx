@@ -114,7 +114,28 @@ export default function SharedChatPage() {
           return;
         }
 
-        const data = await response.json();
+        // Check content-type before parsing JSON to avoid parsing HTML error pages
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const errorText = await response.text();
+          console.error('[SHARED] Non-JSON response received:', contentType);
+          console.error('[SHARED] Response preview:', errorText.substring(0, 200));
+          setError('Invalid response from server. The shared chat endpoint may not be configured correctly.');
+          setIsLoading(false);
+          return;
+        }
+
+        let data;
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          console.error('[SHARED] Failed to parse JSON response:', jsonError);
+          const errorText = await response.text();
+          console.error('[SHARED] Response body preview:', errorText.substring(0, 500));
+          setError('Invalid response format from server. Please try again.');
+          setIsLoading(false);
+          return;
+        }
         
         // Check if this is an existing copy or a new one
         if (data.is_existing) {
