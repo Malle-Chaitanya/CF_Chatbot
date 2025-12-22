@@ -6,8 +6,10 @@ from app.graph_store import get_graph_store
 from config import (
     CHROMA_DB_PATH, INITIALIZE_VECTORSTORE,
     ENABLE_WEB_SOURCE, ENABLE_PDF_SOURCE, ENABLE_EXCEL_SOURCE, ENABLE_DOC_SOURCE, ENABLE_SHAREPOINT_SOURCE, ENABLE_OUTLOOK_SOURCE,
+    ENABLE_SHAREPOINT_SALES_SOURCE,
     WEB_SOURCE_URL, PDF_SOURCE_DIR, EXCEL_SOURCE_DIR, DOC_SOURCE_DIR, BLOG_START_PAGE,
     SHAREPOINT_SITE_URL, SHAREPOINT_START_PAGE,
+    SHAREPOINT_SALES_SITE_URL, SHAREPOINT_SALES_FOLDER_PATH,
     OUTLOOK_USER_EMAIL, OUTLOOK_FOLDER_NAME,
 )
 import os
@@ -81,6 +83,11 @@ def get_current_metadata():
         sharepoint_path = f"{SHAREPOINT_START_PAGE}" if SHAREPOINT_START_PAGE else "Documents Library"
         metadata["sharepoint"] = f"{SHAREPOINT_SITE_URL}/{sharepoint_path}"
         metadata["enabled_sources"].append("sharepoint")
+    
+    if ENABLE_SHAREPOINT_SALES_SOURCE:
+        # Store SharePoint Sales metadata (entire Documents library)
+        metadata["sharepoint_sales"] = SHAREPOINT_SALES_SITE_URL
+        metadata["enabled_sources"].append("sharepoint_sales")
     
     if ENABLE_OUTLOOK_SOURCE:
         # Store Outlook metadata - folder and user email
@@ -171,6 +178,27 @@ def get_changed_sources():
         elif "web" not in changed_sources:
             print("[!] Web source enabled - checking for latest blogs (incremental update)")
             changed_sources.append("web")
+    
+    # Additional check: Only rebuild SharePoint Sales if enabled and not already built
+    if "sharepoint_sales" in enabled_sources:
+        stored_sales = stored_metadata.get("sharepoint_sales", "")
+        current_sales = current_metadata.get("sharepoint_sales", "")
+        
+        if stored_sales != current_sales:
+            # URL has changed - rebuild needed
+            print(f"[!] SharePoint Sales path has changed")
+            print(f"   Stored: {stored_sales}")
+            print(f"   Current: {current_sales}")
+            if "sharepoint_sales" not in changed_sources:
+                changed_sources.append("sharepoint_sales")
+        elif not stored_sales:
+            # First time - no stored URL, initial build needed
+            print("[!] SharePoint Sales - initial build needed (not built yet)")
+            if "sharepoint_sales" not in changed_sources:
+                changed_sources.append("sharepoint_sales")
+        else:
+            # Already built with current URL - skip rebuild, just load existing
+            print("[OK] SharePoint Sales - already built, loading existing vectorstore")
     
     if changed_sources:
         print(f"[*] Changed sources: {', '.join(changed_sources)}")
@@ -432,6 +460,92 @@ def build_enhanced_vectorstore_full() -> Chroma:
         else:
             print("[INFO] Skipping SharePoint ingestion in incremental mode")
 
+    # ---- SHAREPOINT SALES (CFSales - separate, incremental) ----
+    if ENABLE_SHAREPOINT_SALES_SOURCE:
+        try:
+            from app.helpers import fetch_latest_sharepoint_sales
+            
+            if existing_vectorstore:
+                # INCREMENTAL MODE: Only fetch latest documents
+                print("[*] INCREMENTAL MODE: Fetching latest SharePoint Sales documents...")
+                sales_docs = fetch_latest_sharepoint_sales(max_items=100)
+                print(f"[INGEST] Latest SharePoint Sales docs: {len(sales_docs)}")
+                
+                # Deduplicate by checking existing vectorstore
+                if sales_docs:
+                    existing_identifiers = set()
+                    existing_docs = existing_vectorstore.get(include=["metadatas"])
+                    
+                    print(f"[DEBUG] Checking {len(sales_docs)} new documents against {len(existing_docs.get('metadatas', []))} existing documents")
+                    
+                    for meta in existing_docs.get("metadatas", []):
+                        # Use unique identifiers: page_url/file_url first, then file_name+folder_path combo
+                        # Don't use "source" as it's the same for all SharePoint docs ("cloudfuze_doc360")
+                        identifier = (
+                            meta.get("page_url") or 
+                            meta.get("file_url") or 
+                            meta.get("webUrl") or
+                            # Fallback: create unique ID from file_name + folder_path
+                            (f"{meta.get('file_name', '')}||{meta.get('folder_path', '')}" if meta.get('file_name') else None)
+                        )
+                        if identifier:
+                            existing_identifiers.add(identifier)
+                            # Also add normalized versions (remove query params, trailing slashes)
+                            if isinstance(identifier, str) and identifier.startswith('http'):
+                                # Add normalized URL (remove query params)
+                                normalized = identifier.split('?')[0].rstrip('/')
+                                if normalized != identifier:
+                                    existing_identifiers.add(normalized)
+                    
+                    print(f"[DEBUG] Found {len(existing_identifiers)} unique identifiers in existing vectorstore")
+                    
+                    def get_doc_identifier(doc_meta):
+                        """Get unique identifier for a document."""
+                        identifier = (
+                            doc_meta.get("page_url") or 
+                            doc_meta.get("file_url") or 
+                            doc_meta.get("webUrl") or
+                            # Fallback: create unique ID from file_name + folder_path
+                            (f"{doc_meta.get('file_name', '')}||{doc_meta.get('folder_path', '')}" if doc_meta.get('file_name') else None)
+                        )
+                        # Return both original and normalized version
+                        if identifier and isinstance(identifier, str) and identifier.startswith('http'):
+                            return [identifier, identifier.split('?')[0].rstrip('/')]
+                        return [identifier] if identifier else [None]
+                    
+                    new_sales_docs = []
+                    duplicate_count = 0
+                    for doc in sales_docs:
+                        doc_identifiers = get_doc_identifier(doc.metadata)
+                        # Check if any identifier variant matches
+                        is_duplicate = any(ident in existing_identifiers for ident in doc_identifiers if ident)
+                        
+                        if not is_duplicate:
+                            new_sales_docs.append(doc)
+                        else:
+                            duplicate_count += 1
+                            if duplicate_count <= 5:  # Log first 5 duplicates for debugging
+                                print(f"[DEBUG] Duplicate found: {doc.metadata.get('file_name', 'Unknown')} - {doc_identifiers[0]}")
+                    
+                    print(f"[OK] New SharePoint Sales documents to add: {len(new_sales_docs)} (skipped {duplicate_count} duplicates)")
+                    if len(new_sales_docs) == 0 and len(sales_docs) > 0:
+                        print(f"[WARNING] All {len(sales_docs)} documents were marked as duplicates!")
+                        print(f"[DEBUG] Sample document metadata: {sales_docs[0].metadata}")
+                        print(f"[DEBUG] Sample identifier: {get_doc_identifier(sales_docs[0].metadata)}")
+                    
+                    sales_docs = new_sales_docs
+            else:
+                # FULL BUILD MODE: Fetch all documents from entire Documents library
+                print("[*] FULL BUILD MODE: Fetching all SharePoint Sales documents from CFSales...")
+                sales_docs = fetch_latest_sharepoint_sales(max_items=99999)  # Get all documents
+                print(f"[INGEST] SharePoint Sales docs: {len(sales_docs)}")
+            
+            if sales_docs:
+                chunks = builder.process_documents(sales_docs, source_type="sharepoint_sales")
+                all_chunks.extend(chunks)
+        except Exception as e:
+            print(f"[WARN] SharePoint Sales ingestion failed: {e}")
+
     # ---- OUTLOOK / EMAIL ----
     if ENABLE_OUTLOOK_SOURCE:
         if not existing_vectorstore:  # Only process Outlook if building from scratch
@@ -640,4 +754,370 @@ else:
     retriever = None
     similarity_retriever = None
     bm25_retriever = None
+    print("[INFO] No vectorstore available - set INITIALIZE_VECTORSTORE=true to create one")
+
+
+
+def build_selective_vectorstore():
+
+    """Build vectorstore with only enabled sources using enhanced pipeline (Option E)."""
+
+    print("[*] Using enhanced full rebuild for selective build (Option E)")
+
+    return build_enhanced_vectorstore_full()
+
+
+
+def manage_vectorstore_backup_and_rebuild():
+
+    """Manage vectorstore backup and rebuild with proper versioning."""
+
+    import shutil
+
+    from datetime import datetime
+
+    import time
+
+    
+
+    # Create data directory if it doesn't exist
+
+    os.makedirs("./data", exist_ok=True)
+
+    
+
+    backup_path = "./data/chroma_db_backup"
+
+    current_path = CHROMA_DB_PATH
+
+    
+
+    print("=" * 60)
+
+    print("VECTORSTORE BACKUP AND REBUILD MANAGEMENT")
+
+    print("=" * 60)
+
+    print(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    print(f"Current vectorstore: {current_path}")
+
+    print(f"Backup vectorstore: {backup_path}")
+
+    print("-" * 60)
+
+    
+
+    # Step 1: Create backup of existing vectorstore (if it exists)
+
+    if os.path.exists(current_path):
+
+        try:
+
+            # Remove old backup if it exists
+
+            if os.path.exists(backup_path):
+
+                shutil.rmtree(backup_path)
+
+                print("[OK] Removed old backup vectorstore")
+
+            
+
+            # Create backup of current vectorstore
+
+            shutil.copytree(current_path, backup_path)
+
+            print("[OK] Created backup of existing vectorstore")
+
+            print(f"  Backup created at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+            
+
+        except Exception as e:
+
+            print(f"[WARNING] Could not create backup: {e}")
+
+    else:
+
+        print("[INFO] No existing vectorstore found - this will be the first build")
+
+    
+
+    # Step 2: Remove current vectorstore to force fresh rebuild
+
+    if os.path.exists(current_path):
+
+        try:
+
+            shutil.rmtree(current_path)
+
+            print("[OK] Removed current vectorstore for fresh rebuild")
+
+        except Exception as e:
+
+            print(f"[WARNING] Could not remove current vectorstore: {e}")
+
+    
+
+    # Step 3: Rebuild vectorstore with latest data
+
+    print("[OK] Starting fresh vectorstore rebuild...")
+
+    print("-" * 60)
+
+    return rebuild_vectorstore_if_needed()
+
+
+
+def initialize_vectorstore():
+
+    """Smart vectorstore initialization that only rebuilds when needed."""
+
+    print("=" * 60)
+
+    print(">> INITIALIZING CF-CHATBOT KNOWLEDGE BASE")
+
+    print("=" * 60)
+
+    
+
+    # Check if rebuild is needed
+
+    if should_rebuild_vectorstore():
+
+        print("[*] Rebuilding vectorstore...")
+
+        vectorstore = rebuild_vectorstore_if_needed()
+
+    else:
+
+        # Try to load existing vectorstore
+
+        vectorstore = load_existing_vectorstore()
+
+        if vectorstore is None:
+
+            print("[!] Failed to load existing vectorstore, rebuilding...")
+
+            vectorstore = rebuild_vectorstore_if_needed()
+
+    
+
+    print("[OK] Vectorstore initialization complete!")
+
+    print("=" * 60)
+
+    return vectorstore
+
+
+
+# Initialize vectorstore based on environment variable
+
+def get_vectorstore():
+
+    """Get vectorstore instance - always try to load existing, rebuild only if INITIALIZE_VECTORSTORE=true."""
+
+    
+
+    # First, try to load existing vectorstore (always attempt this)
+
+    try:
+
+        if os.path.exists(CHROMA_DB_PATH):
+
+            print("[*] Loading existing vectorstore...")
+
+            return load_existing_vectorstore()
+
+        else:
+
+            print("[!] No existing vectorstore found")
+
+            # If no vectorstore exists and INITIALIZE_VECTORSTORE=true, create one
+
+            if INITIALIZE_VECTORSTORE:
+
+                print("[*] INITIALIZE_VECTORSTORE=true - creating new vectorstore...")
+
+                return initialize_vectorstore()
+
+            else:
+
+                print("[*] INITIALIZE_VECTORSTORE=false - no vectorstore available")
+
+                return None
+
+    except Exception as e:
+
+        print(f"[!] Failed to load existing vectorstore: {e}")
+
+        # If loading fails and INITIALIZE_VECTORSTORE=true, try to rebuild
+
+        if INITIALIZE_VECTORSTORE:
+
+            print("[*] INITIALIZE_VECTORSTORE=true - attempting rebuild...")
+
+            return initialize_vectorstore()
+
+        else:
+
+            return None
+
+
+
+def check_and_rebuild_if_needed():
+
+    """Check if rebuild is needed and rebuild only if INITIALIZE_VECTORSTORE=true."""
+
+    if not INITIALIZE_VECTORSTORE:
+
+        print("[*] INITIALIZE_VECTORSTORE=false - skipping rebuild check")
+
+        return False
+
+    
+
+    print("[*] INITIALIZE_VECTORSTORE=true - checking if rebuild is needed...")
+
+    
+
+    # Check if rebuild is needed based on enabled sources
+
+    if should_rebuild_vectorstore():
+
+        print("[*] Rebuild needed - initializing vectorstore...")
+
+        return initialize_vectorstore()
+
+    else:
+
+        print("[OK] No rebuild needed - using existing vectorstore")
+
+        return True
+
+
+
+# Initialize vectorstore - always try to load existing
+
+vectorstore = get_vectorstore()
+
+
+
+# Check if rebuild is needed (only if INITIALIZE_VECTORSTORE=true)
+
+if INITIALIZE_VECTORSTORE:
+
+    print("[*] INITIALIZE_VECTORSTORE=true - checking for rebuild...")
+
+    rebuild_result = check_and_rebuild_if_needed()
+
+    if rebuild_result:
+
+        # Reload vectorstore after potential rebuild
+
+        vectorstore = get_vectorstore()
+
+
+
+if vectorstore:
+
+    # Create a hybrid retriever with MMR (Maximal Marginal Relevance) for diverse results
+
+    # MMR balances relevance with diversity to avoid redundant results
+
+    retriever = vectorstore.as_retriever(
+
+        search_type="mmr",  # Use MMR instead of plain similarity
+
+        search_kwargs={
+
+            "k": 25,  # Number of documents to return
+
+            "fetch_k": 50,  # Fetch more candidates for MMR to choose from
+
+            "lambda_mult": 0.7,  # Balance relevance (1.0) vs diversity (0.0) - 0.7 is good balance
+
+        }
+
+    )
+
+    
+
+    # Also create a similarity retriever as fallback
+
+    similarity_retriever = vectorstore.as_retriever(
+
+        search_type="similarity",
+
+        search_kwargs={
+
+            "k": 25,
+
+        }
+
+    )
+
+    
+
+    print("[OK] Vectorstore available with hybrid retrieval:")
+
+    print("    - Primary: MMR (Maximal Marginal Relevance) for diverse results")
+
+    print("    - Graph indexing: HNSW for efficient similarity search")
+
+    print("    - Fallback: Similarity search")
+
+    
+
+    # ============================================================================
+
+    # OPTION E: BM25 INITIALIZATION
+
+    # ============================================================================
+
+    bm25_retriever = None
+
+    try:
+
+        print("[*] Building BM25 index for Option E hybrid retrieval...")
+
+        # Pull all documents once for BM25
+
+        # NOTE: Chroma exposes .get() to fetch docs
+
+        all_docs_data = vectorstore.get(include=["metadatas", "documents"])
+
+        raw_texts = all_docs_data["documents"]
+
+        metadatas = all_docs_data["metadatas"]
+
+
+
+        docs = []
+
+        for text, meta in zip(raw_texts, metadatas):
+
+            docs.append(Document(page_content=text, metadata=meta or {}))
+
+
+
+        bm25_retriever = BM25Retriever(docs)
+
+        print(f"[OK] BM25 index ready over {len(docs)} documents")
+
+    except Exception as e:
+
+        print(f"[WARN] Failed to build BM25 index: {e}")
+
+        bm25_retriever = None
+
+else:
+
+    retriever = None
+
+    similarity_retriever = None
+
+    bm25_retriever = None
+
     print("[INFO] No vectorstore available - set INITIALIZE_VECTORSTORE=true to create one")

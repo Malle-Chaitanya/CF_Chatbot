@@ -248,6 +248,21 @@ SHAREPOINT_START_PAGE = os.getenv("SHAREPOINT_START_PAGE", "")  # Changed from c
 SHAREPOINT_MAX_DEPTH = int(os.getenv("SHAREPOINT_MAX_DEPTH", "999"))  # Changed to 999 for unlimited depth
 SHAREPOINT_EXCLUDE_FILES = os.getenv("SHAREPOINT_EXCLUDE_FILES", "true").lower() == "true"
 
+# Secondary SharePoint - CFSales (separate source with priority)
+ENABLE_SHAREPOINT_SALES_SOURCE = os.getenv("ENABLE_SHAREPOINT_SALES_SOURCE", "false").lower() == "true"
+SHAREPOINT_SALES_SITE_URL = os.getenv("SHAREPOINT_SALES_SITE_URL", "https://cloudfuzecom.sharepoint.com/sites/CFSales")
+SHAREPOINT_SALES_FOLDER_PATH = os.getenv("SHAREPOINT_SALES_FOLDER_PATH", "Pre-Sales Trining - Documents - Release 1 - All Documents")
+SHAREPOINT_SALES_MAX_DEPTH = int(os.getenv("SHAREPOINT_SALES_MAX_DEPTH", "999"))
+SHAREPOINT_SALES_PRIORITY = os.getenv("SHAREPOINT_SALES_PRIORITY", "false").lower() == "true"
+
+# PPTX Extraction Pipeline
+# Extract PPTX files and add to vectorstore (production-ready)
+ENABLE_PPTX_PIPELINE = os.getenv("ENABLE_PPTX_PIPELINE", "false").lower() == "true"
+# Optional: Save extracted PPTX to files (disabled by default for production/GitHub)
+ENABLE_PPTX_SAVE_FILES = os.getenv("ENABLE_PPTX_SAVE_FILES", "false").lower() == "true"
+PPTX_OUTPUT_DIR = os.getenv("PPTX_OUTPUT_DIR", "./data/pptx_extracted")
+PPTX_SAVE_FORMAT = os.getenv("PPTX_SAVE_FORMAT", "json")  # "json" or "text"
+
 # Outlook Email Configuration
 OUTLOOK_USER_EMAIL = os.getenv("OUTLOOK_USER_EMAIL", "")  # Email address to access (required for application permissions)
 OUTLOOK_FOLDER_NAME = os.getenv("OUTLOOK_FOLDER_NAME", "Inbox")  # Folder name to extract emails from

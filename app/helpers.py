@@ -2,13 +2,17 @@ import os
 import requests
 import json
 import markdown
+from typing import List
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from config import CHROMA_DB_PATH, BLOG_POSTS_PER_PAGE, BLOG_MAX_PAGES, BLOG_START_PAGE
+from config import (
+    CHROMA_DB_PATH, BLOG_POSTS_PER_PAGE, BLOG_MAX_PAGES, BLOG_START_PAGE,
+    SHAREPOINT_SALES_SITE_URL, SHAREPOINT_SALES_FOLDER_PATH, SHAREPOINT_SALES_MAX_DEPTH
+)
 from app.pdf_processor import process_pdf_directory, chunk_pdf_documents
 from app.excel_processor import process_excel_directory, chunk_excel_documents
 from app.doc_processor import process_doc_directory, chunk_doc_documents
@@ -256,6 +260,96 @@ def fetch_web_content(url: str):
     print(f"[OK] Loaded {posts_processed} blog posts into {len(all_docs)} chunks with full metadata")
     return all_docs
 
+def fetch_latest_sharepoint_sales(max_items: int = 100) -> List[Document]:
+    """
+    Fetch SharePoint documents from CFSales Documents library.
+    Processes the entire Documents library (all folders and files).
+    Similar to fetch_latest_web_content for blogs - optimized for incremental updates.
+    
+    Args:
+        max_items: Maximum number of latest documents to fetch (default: 100)
+                  Set to 9999 to get all documents
+    
+    Returns:
+        List of Document objects for SharePoint Sales documents
+    """
+    from app.sharepoint_graph_extractor import SharePointGraphExtractor
+    from config import (
+        SHAREPOINT_SALES_SITE_URL,
+        SHAREPOINT_SALES_MAX_DEPTH
+    )
+    
+    print(f"[*] Fetching SharePoint documents from CFSales...")
+    print(f"   Site: {SHAREPOINT_SALES_SITE_URL}")
+    print(f"   Processing: Entire Documents library")
+    
+    # Extract just the site URL from the full path
+    # e.g., https://cloudfuzecom.sharepoint.com/sites/CFSales/Shared%20Documents/Forms/AllItems.aspx
+    # becomes: https://cloudfuzecom.sharepoint.com/sites/CFSales
+    parsed_url = urlparse(SHAREPOINT_SALES_SITE_URL)
+    path_parts = [p for p in parsed_url.path.split('/') if p]
+    
+    # Find 'sites' in path and extract site URL
+    clean_site_url = SHAREPOINT_SALES_SITE_URL  # Default to original
+    if 'sites' in path_parts:
+        site_idx = path_parts.index('sites')
+        if site_idx + 1 < len(path_parts):
+            # Build clean site URL: https://hostname/sites/sitename
+            clean_site_url = f"{parsed_url.scheme}://{parsed_url.netloc}/sites/{path_parts[site_idx + 1]}"
+            print(f"[*] Extracted site URL: {clean_site_url}")
+        else:
+            print("[ERROR] Could not extract site name from URL")
+            return []
+    else:
+        # If no 'sites' found, use URL as-is (might already be clean)
+        print(f"[*] Using site URL as-is: {clean_site_url}")
+    
+    # Create extractor with cleaned sales site URL
+    extractor = SharePointGraphExtractor()
+    extractor.site_url = clean_site_url
+    # Reset cached IDs so they're fetched for the new site
+    extractor.site_id = None
+    extractor.drive_id = None
+    
+    # Get site and drive IDs
+    site_id = extractor.get_site_id()
+    if not site_id:
+        print("[ERROR] Failed to get CFSales site ID")
+        return []
+    
+    drive_id = extractor.get_drive_id()
+    if not drive_id:
+        print("[ERROR] Failed to get CFSales drive ID")
+        return []
+    
+    # Extract documents from the entire Documents library (root folder)
+    print(f"[*] Extracting documents from entire Documents library...")
+    documents = extractor.extract_from_folder(
+        item_id=None,  # None means root folder (Documents library)
+        folder_path=[],  # Empty path means root
+        visited_ids=set(),
+        depth=0
+    )
+    
+    # Sort by modified date (newest first) and limit
+    # Note: SharePoint documents may have 'lastModifiedDateTime' in metadata
+    documents.sort(
+        key=lambda d: d.metadata.get('modified_at', '') or d.metadata.get('lastModifiedDateTime', ''),
+        reverse=True
+    )
+    documents = documents[:max_items]
+    
+    # Add priority tag and source type
+    for doc in documents:
+        doc.metadata['source_type'] = 'sharepoint_sales'
+        # Get folder path from metadata if available
+        folder_path = doc.metadata.get('folder_tags', '').replace('sharepoint/', '') or 'Documents'
+        doc.metadata['tag'] = f"sharepoint_sales/{folder_path}"
+        doc.metadata['priority'] = True  # Mark for priority boosting
+    
+    print(f"[OK] Fetched {len(documents)} SharePoint Sales documents from CFSales")
+    return documents
+
 def strip_markdown(md_text: str) -> str:
     """Convert Markdown/HTML to plain text."""
     html = markdown.markdown(md_text)
@@ -415,4 +509,230 @@ def build_combined_vectorstore(url: str = None, pdf_directory: str = None, excel
         print(f"   [OK] Batch {batch_num}/{total_batches} complete")
     
     print("\n[OK] Selective knowledge base created with HNSW graph indexing!")
+    return vectorstore
+
+    return vectorstore
+
+
+
+def build_combined_vectorstore(url: str = None, pdf_directory: str = None, excel_directory: str = None, doc_directory: str = None, sharepoint_enabled: bool = False, outlook_enabled: bool = False):
+
+    """Build and persist embeddings for enabled sources only."""
+
+    all_docs = []
+
+    
+
+    # Process web content if URL provided
+
+    if url:
+
+        print("Loading web content...")
+
+        # Use fetch_web_content which now includes blog post URLs and metadata
+
+        web_docs = fetch_web_content(url)
+
+        all_docs.extend(web_docs)
+
+        print(f"  - Web documents: {len(web_docs)}")
+
+    else:
+
+        print("Web content disabled - skipping...")
+
+    
+
+    # Process PDF documents if directory provided
+
+    if pdf_directory and os.path.exists(pdf_directory):
+
+        print("Processing PDF documents...")
+
+        pdf_docs = process_pdf_directory(pdf_directory)
+
+        pdf_chunks = chunk_pdf_documents(pdf_docs, chunk_size=1000, chunk_overlap=200)
+
+        all_docs.extend(pdf_chunks)
+
+        print(f"  - PDF documents: {len(pdf_chunks)}")
+
+    else:
+
+        print("PDF processing disabled or directory not found - skipping...")
+
+    
+
+    # Process Excel files if directory provided
+
+    if excel_directory and os.path.exists(excel_directory):
+
+        print("Processing Excel documents...")
+
+        excel_docs = process_excel_directory(excel_directory)
+
+        excel_chunks = chunk_excel_documents(excel_docs, chunk_size=1000, chunk_overlap=200)
+
+        all_docs.extend(excel_chunks)
+
+        print(f"  - Excel documents: {len(excel_chunks)}")
+
+    else:
+
+        print("Excel processing disabled or directory not found - skipping...")
+
+    
+
+    # Process Word documents if directory provided
+
+    if doc_directory and os.path.exists(doc_directory):
+
+        print("Processing Word documents...")
+
+        doc_docs = process_doc_directory(doc_directory)
+
+        doc_chunks = chunk_doc_documents(doc_docs, chunk_size=1000, chunk_overlap=200)
+
+        all_docs.extend(doc_chunks)
+
+        print(f"  - Word documents: {len(doc_chunks)}")
+
+    else:
+
+        print("Word document processing disabled or directory not found - skipping...")
+
+    
+
+    # Process SharePoint content if enabled
+
+    if sharepoint_enabled:
+
+        print("Processing SharePoint content...")
+
+        try:
+
+            sharepoint_docs = process_sharepoint_content()
+
+            all_docs.extend(sharepoint_docs)
+
+            print(f"  - SharePoint documents: {len(sharepoint_docs)}")
+
+        except Exception as e:
+
+            print(f"[ERROR] SharePoint processing failed: {e}")
+
+            print("  - SharePoint documents: 0 (failed)")
+
+    else:
+
+        print("SharePoint processing disabled - skipping...")
+
+    
+
+    # Process Outlook email content if enabled
+
+    if outlook_enabled:
+
+        print("Processing Outlook email content...")
+
+        try:
+
+            from app.outlook_processor import process_outlook_content
+
+            outlook_docs = process_outlook_content()
+
+            all_docs.extend(outlook_docs)
+
+            print(f"  - Outlook email documents: {len(outlook_docs)}")
+
+        except Exception as e:
+
+            print(f"[ERROR] Outlook processing failed: {e}")
+
+            print("  - Outlook email documents: 0 (failed)")
+
+    else:
+
+        print("Outlook processing disabled - skipping...")
+
+    
+
+    print(f"Total documents to process: {len(all_docs)}")
+
+    
+
+    # Create embeddings and vectorstore with batch processing to avoid token limits
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+    
+
+    # Process in batches to avoid OpenAI token limit (300k tokens per request)
+
+    # Each batch: ~50 docs = ~50k tokens (safe margin)
+
+    batch_size = 50
+
+    total_batches = (len(all_docs) + batch_size - 1) // batch_size
+
+    
+
+    print(f"\n[*] Creating vectorstore with HNSW graph indexing...")
+
+    print(f"[*] Processing {total_batches} batches of up to {batch_size} documents each...")
+
+    
+
+    vectorstore = None
+
+    for i in range(0, len(all_docs), batch_size):
+
+        batch = all_docs[i:i + batch_size]
+
+        batch_num = (i // batch_size) + 1
+
+        print(f"   [*] Processing batch {batch_num}/{total_batches} ({len(batch)} documents)...")
+
+        
+
+        if vectorstore is None:
+
+            # Create vectorstore with first batch and HNSW graph indexing
+
+            vectorstore = Chroma.from_documents(
+
+                batch, 
+
+                embeddings, 
+
+                persist_directory=CHROMA_DB_PATH,
+
+                collection_metadata={
+
+                    "hnsw:space": "cosine",  # Cosine similarity for semantic search
+
+                    "hnsw:construction_ef": 200,  # Better indexing accuracy
+
+                    "hnsw:search_ef": 100,  # Better search accuracy
+
+                    "hnsw:M": 48,  # More graph connections for better recall
+
+                }
+
+            )
+
+        else:
+
+            # Add subsequent batches
+
+            vectorstore.add_documents(batch)
+
+        
+
+        print(f"   [OK] Batch {batch_num}/{total_batches} complete")
+
+    
+
+    print("\n[OK] Selective knowledge base created with HNSW graph indexing!")
+
     return vectorstore
