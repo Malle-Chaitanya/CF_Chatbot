@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ChatSidebar from '@/components/ChatSidebar';
 import SessionCard from '@/components/SessionCard';
-import { getCurrentUser, verifyToken, getAllSessions, fetchAndMergeUserSessions } from '@/lib/session-utils';
+import { getCurrentUser, checkSession, getAllSessions, fetchAndMergeUserSessions } from '@/lib/session-utils';
 import { ChatSession } from '@/types/chat';
 
 export default function ChatsPage() {
@@ -31,11 +31,6 @@ export default function ChatsPage() {
     }
   }, [isSidebarOpen]);
 
-  // Verify token with Microsoft Graph API
-  const verifyTokenCallback = useCallback(async (accessToken: string): Promise<boolean> => {
-    return await verifyToken(accessToken);
-  }, []);
-
   // Authentication check BEFORE rendering
   useEffect(() => {
     if (authCheckRef.current) {
@@ -47,51 +42,19 @@ export default function ChatsPage() {
     
     const checkAuth = async () => {
       try {
-        let isBackForwardNavigation = false;
-        try {
-          const navEntries = window.performance.getEntriesByType('navigation');
-          if (navEntries.length > 0) {
-            const navEntry = navEntries[0] as PerformanceNavigationTiming;
-            isBackForwardNavigation = navEntry.type === 'back_forward';
-            if (isBackForwardNavigation) {
-              console.log('[AUTH] Detected back/forward navigation, skipping token verification');
-            }
-          }
-        } catch (e) {
-          // Performance API not available
+        const sessionValid = await checkSession();
+        if (!sessionValid) {
+          console.log('[AUTH] Session invalid or expired, redirecting to login');
+          localStorage.removeItem('user');
+          router.replace('/login?error=session_expired');
+          return;
         }
-        
+
         const user = getCurrentUser();
-        
-        if (!user) {
-          console.log('[AUTH] No user found, redirecting to login');
-          router.replace('/login');
-          return;
-        }
-
-        if (!user.access_token) {
-          console.log('[AUTH] No access token found, redirecting to login');
+        if (!user || !user.email || !user.email.endsWith('@cloudfuze.com')) {
+          console.log('[AUTH] Invalid user data, redirecting to login');
           localStorage.removeItem('user');
-          router.replace('/login');
-          return;
-        }
-
-        if (!isBackForwardNavigation) {
-          console.log('[AUTH] Verifying access token...');
-          const isValid = await verifyTokenCallback(user.access_token);
-          
-          if (!isValid) {
-            console.log('[AUTH] Token is invalid or expired, redirecting to login');
-            localStorage.removeItem('user');
-            router.replace('/login?error=session_expired');
-            return;
-          }
-        }
-
-        if (!user.email || !user.email.endsWith('@cloudfuze.com')) {
-          console.log('[AUTH] Non-CloudFuze email detected, redirecting to login');
-          localStorage.removeItem('user');
-          router.replace('/login?error=unauthorized_domain&email=' + encodeURIComponent(user.email || ''));
+          router.replace('/login?error=unauthorized_domain&email=' + encodeURIComponent(user?.email || ''));
           return;
         }
 
@@ -109,7 +72,7 @@ export default function ChatsPage() {
     };
 
     checkAuth();
-  }, [router, verifyTokenCallback]);
+  }, [router]);
 
   // Load sessions after authentication
   useEffect(() => {

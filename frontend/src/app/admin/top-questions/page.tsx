@@ -56,10 +56,11 @@ export default function AdminTopQuestionsPage() {
         const response = await fetch(
           `${getApiBase()}/admin/top-questions?limit=${lim}&source=${src}`,
           {
+            method: 'GET',
             headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${user.access_token}`
-            }
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include'
           }
         );
 

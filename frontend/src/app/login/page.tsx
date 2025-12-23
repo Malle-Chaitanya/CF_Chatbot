@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Snowfall from 'react-snowfall';
 import { apiFetch } from '@/lib/api';
 import { checkSession } from '@/lib/session-utils';
+import Snowfall from 'react-snowfall';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -51,6 +52,22 @@ function initializeLoginPage() {
   let MICROSOFT_TENANT = "cloudfuze.com";
   const MICROSOFT_REDIRECT_URI = window.location.origin + '/login';
   const MICROSOFT_SCOPE = "openid email profile User.Read";
+
+  // ✅ Save redirect URL immediately on page load (not just on button click)
+  // This ensures the redirect URL is preserved even if sessionStorage is cleared during OAuth
+  const urlParamsOnLoad = new URLSearchParams(window.location.search);
+  const redirectUrlOnLoad = urlParamsOnLoad.get('redirect');
+  if (redirectUrlOnLoad) {
+    // Only save if not already saved or if it's different (don't overwrite unnecessarily)
+    const existingRedirect = sessionStorage.getItem('oauth_redirect');
+    if (!existingRedirect || existingRedirect !== redirectUrlOnLoad) {
+      sessionStorage.setItem('oauth_redirect', redirectUrlOnLoad);
+      localStorage.setItem('oauth_redirect_backup', redirectUrlOnLoad);
+      console.log('[AUTH] Saved redirect URL on page load:', redirectUrlOnLoad);
+    } else {
+      console.log('[AUTH] Redirect URL already saved:', redirectUrlOnLoad);
+    }
+  }
 
   // Load Microsoft OAuth configuration from backend
   async function loadOAuthConfig() {
@@ -140,8 +157,18 @@ function initializeLoginPage() {
     localStorage.removeItem('user'); // Clear any old user data
     
     // Save redirect URL before starting OAuth (use both sessionStorage and localStorage for reliability)
+    // ✅ ENHANCED: Check URL params first, then use existing saved value if URL params are empty
     const urlParams = new URLSearchParams(window.location.search);
-    const redirectUrl = urlParams.get('redirect');
+    let redirectUrl = urlParams.get('redirect');
+    
+    // If no redirect in URL params, check if we already saved one (from page load)
+    if (!redirectUrl) {
+      redirectUrl = sessionStorage.getItem('oauth_redirect') || localStorage.getItem('oauth_redirect_backup') || null;
+      if (redirectUrl) {
+        console.log('[AUTH] No redirect in URL params, using saved redirect URL:', redirectUrl);
+      }
+    }
+    
     if (redirectUrl) {
       sessionStorage.setItem('oauth_redirect', redirectUrl);
       localStorage.setItem('oauth_redirect_backup', redirectUrl);  // Backup in localStorage
@@ -150,7 +177,7 @@ function initializeLoginPage() {
       console.log('[AUTH] sessionStorage value after save:', sessionStorage.getItem('oauth_redirect'));
       console.log('[AUTH] localStorage backup value after save:', localStorage.getItem('oauth_redirect_backup'));
     } else {
-      console.log('[AUTH] No redirect URL found in URL parameters');
+      console.log('[AUTH] No redirect URL found in URL parameters or storage');
     }
     
     const button = event.target as HTMLButtonElement;
@@ -356,6 +383,14 @@ function initializeLoginPage() {
           console.log('[AUTH] sessionStorage was empty, using localStorage backup');
         } else {
           console.log('[AUTH] Retrieved redirect URL from sessionStorage');
+        }
+        
+        // ✅ ADD THIS: Log warning if redirect URL is default (might indicate a problem)
+        if (redirectUrl === '/') {
+          console.warn('[AUTH] ⚠️ Redirect URL is default (/). This might indicate the redirect URL was lost.');
+          console.warn('[AUTH] Current URL:', window.location.href);
+          console.warn('[AUTH] sessionStorage oauth_redirect:', sessionStorage.getItem('oauth_redirect'));
+          console.warn('[AUTH] localStorage oauth_redirect_backup:', localStorage.getItem('oauth_redirect_backup'));
         }
         
         // Clean up both storage locations

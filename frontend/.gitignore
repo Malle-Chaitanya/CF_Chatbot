@@ -41,3 +41,4 @@ yarn-error.log*
 next-env.d.ts
 langfuse_traces_backup
 chatbot-pre-react4shell.tar.gz
+langfuse_traces_backup/

@@ -84,8 +84,9 @@ echo -e "${GREEN}✓ Repository cloned${NC}"
 
 # Step 4: Copy environment file
 echo -e "${YELLOW}Step 5: Setting up environment variables...${NC}"
-echo -e "${RED}IMPORTANT: You need to manually create .env.ai on the server${NC}"
+echo -e "${RED}IMPORTANT: Copy env.ai.example to .env.ai on the server and fill in the secrets${NC}"
 echo -e "${YELLOW}The file should contain all your production API keys and configs${NC}"
+echo -e "${YELLOW}env.ai.example now ships with this repo as a reference template${NC}"
 echo ""
 read -p "Press Enter after you've created .env.ai on the server..."
 
