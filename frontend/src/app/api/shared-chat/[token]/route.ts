@@ -47,9 +47,10 @@ async function proxySharedChatRequest(token: string, request: NextRequest) {
 
 export async function GET(
   request: NextRequest,
-  context: { params: { token: string } }
+  context: { params: Promise<{ token: string }> }
 ) {
-  const token = context.params?.token;
+  const params = await context.params;
+  const token = params?.token;
 
   if (!token) {
     return NextResponse.json(
