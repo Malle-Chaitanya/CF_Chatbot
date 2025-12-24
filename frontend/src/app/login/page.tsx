@@ -3,7 +3,6 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import Snowfall from 'react-snowfall';
 import { apiFetch } from '@/lib/api';
 import { checkSession } from '@/lib/session-utils';
 import Snowfall from 'react-snowfall';
