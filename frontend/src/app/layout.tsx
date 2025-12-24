@@ -100,6 +100,20 @@ export default function RootLayout({
           src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"
           strategy="beforeInteractive"
         />
+        
+        {/* Set cursor images dynamically with absolute URLs */}
+        <Script id="cursor-setup" strategy="afterInteractive">
+          {`
+            (function() {
+              const baseUrl = window.location.origin;
+              const cursorTree = baseUrl + "/images/Christmas Tree & Bulb Animated--cursor--SweezyCursors.png";
+              const cursorBulb = baseUrl + "/images/Christmas Tree & Bulb Animated--pointer--SweezyCursors.png";
+              
+              document.documentElement.style.setProperty('--cursor-tree', 'url("' + cursorTree + '") 2 2, auto');
+              document.documentElement.style.setProperty('--cursor-bulb', 'url("' + cursorBulb + '") 2 2, pointer');
+            })();
+          `}
+        </Script>
       </head>
       <body>
         {/* Google Tag Manager (noscript) */}
