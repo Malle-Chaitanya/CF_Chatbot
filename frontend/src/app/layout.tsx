@@ -106,9 +106,9 @@ export default function RootLayout({
           {`
             (function() {
               const baseUrl = window.location.origin;
-              // Properly encode the image filenames
-              const cursorTreeFile = encodeURIComponent("Christmas Tree & Bulb Animated--cursor--SweezyCursors.png");
-              const cursorBulbFile = encodeURIComponent("Christmas Tree & Bulb Animated--pointer--SweezyCursors.png");
+              // Use simple filenames (no encoding needed)
+              const cursorTreeFile = "christmas-cursor.png";
+              const cursorBulbFile = "christmas-pointer.png";
               const cursorTree = baseUrl + "/images/" + cursorTreeFile;
               const cursorBulb = baseUrl + "/images/" + cursorBulbFile;
               

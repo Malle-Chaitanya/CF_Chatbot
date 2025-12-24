@@ -55,8 +55,8 @@
 }
 
 :root {
-  --cursor-tree: url("/images/Christmas Tree & Bulb Animated--cursor--SweezyCursors.png") 2 2, auto;
-  --cursor-bulb: url("/images/Christmas Tree & Bulb Animated--pointer--SweezyCursors.png") 2 2, pointer;
+  --cursor-tree: url("/images/christmas-cursor.png") 2 2, auto;
+  --cursor-bulb: url("/images/christmas-pointer.png") 2 2, pointer;
 }
 
 html {
