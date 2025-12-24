@@ -334,7 +334,115 @@ class SharePointGraphExtractor:
                     # It's a file - extract content
                     print(f"   [*] Processing file: {item_name}")
                     
-                    # Download file content
+                    # Check if it's a PPTX file and if separate PPTX pipeline is enabled
+                    file_ext = item_name.rsplit('.', 1)[-1].lower() if '.' in item_name else ''
+                    is_pptx = file_ext in ['ppt', 'pptx']
+                    
+                    # Handle PPTX files if pipeline is enabled
+                    if is_pptx:
+                        from config import ENABLE_PPTX_PIPELINE, ENABLE_PPTX_SAVE_FILES, PPTX_OUTPUT_DIR
+                        if ENABLE_PPTX_PIPELINE:
+                            try:
+                                # Download PPTX file bytes
+                                drive_id = self.get_drive_id()
+                                if drive_id:
+                                    graph_url = f"{self.graph_base_url}/drives/{drive_id}/items/{item_id_current}/content"
+                                    headers = sharepoint_auth.get_headers()
+                                    pptx_response = requests.get(graph_url, headers=headers, timeout=60, stream=True)
+                                    
+                                    if pptx_response.status_code == 200:
+                                        pptx_bytes = pptx_response.content
+                                        
+                                        # Extract PPTX content
+                                        from app.pptx_processor import PPTXProcessor
+                                        processor = PPTXProcessor(output_dir=PPTX_OUTPUT_DIR)
+                                        
+                                        # Prepare metadata
+                                        pptx_metadata = {
+                                            "source": "sharepoint_sales" if "CFSales" in str(self.site_url) else "sharepoint",
+                                            "file_name": item_name,
+                                            "file_url": web_url,
+                                            "folder_path": " > ".join(folder_path) if folder_path else "Documents",
+                                            "webUrl": web_url,
+                                            "site_url": str(self.site_url)
+                                        }
+                                        
+                                        print(f"      [PPTX] Extracting PPTX: {item_name}")
+                                        extraction_result = processor.process_pptx_from_bytes(
+                                            pptx_bytes,
+                                            item_name,
+                                            pptx_metadata
+                                        )
+                                        
+                                        if extraction_result:
+                                            print(f"      [OK] PPTX extracted: {extraction_result['total_slides']} slides")
+                                            
+                                            # Optionally save to file (disabled by default for production)
+                                            if ENABLE_PPTX_SAVE_FILES:
+                                                processor.save_extraction(extraction_result, format="json")
+                                                print(f"      [OK] PPTX saved to file: {item_name}")
+                                            
+                                            # ADD TO VECTORSTORE - Use extracted content
+                                            file_content = extraction_result.get("combined_content", "")
+                                            
+                                            # Create metadata for vectorstore
+                                            folder_path_str = " > ".join(folder_path).lower() if folder_path else ""
+                                            is_certificate = (
+                                                ('certificate' in folder_path_str or 'cert' in folder_path_str) and
+                                                '2025' in folder_path_str
+                                            )
+                                            
+                                            is_downloadable = False
+                                            if is_certificate:
+                                                is_downloadable = True
+                                            else:
+                                                for downloadable_path in self.downloadable_folders:
+                                                    if downloadable_path in folder_path_str:
+                                                        is_downloadable = True
+                                                        break
+                                            
+                                            # Build tag
+                                            current_folder_path = folder_path + [item_name] if folder_path else [item_name]
+                                            sanitized_path = [f.replace('/', '-').replace('\\', '-').strip() for f in current_folder_path if f.strip()]
+                                            tag = "/".join(["sharepoint"] + sanitized_path)
+                                            
+                                            metadata = {
+                                                "source_type": "sharepoint",
+                                                "source": "cloudfuze_doc360",
+                                                "file_name": item_name,
+                                                "file_url": web_url,
+                                                "folder_path": " > ".join(folder_path) if folder_path else "Documents",
+                                                "folder_tags": tag,
+                                                "tag": tag,
+                                                "page_url": web_url,
+                                                "content_type": "pptx_slide",
+                                                "is_certificate": is_certificate,
+                                                "is_downloadable": is_downloadable,
+                                                "total_slides": extraction_result.get("total_slides", 0),
+                                                "depth": depth
+                                            }
+                                            
+                                            if is_downloadable:
+                                                metadata["download_url"] = web_url
+                                            
+                                            # Create document with extracted PPTX content
+                                            doc = Document(
+                                                page_content=file_content[:15000],  # Limit content size
+                                                metadata=metadata
+                                            )
+                                            all_documents.append(doc)
+                                            print(f"      [OK] Added PPTX to vectorstore: {item_name}")
+                                            continue  # Skip normal processing
+                                        else:
+                                            print(f"      [WARNING] PPTX extraction failed for {item_name}")
+                            except Exception as e:
+                                print(f"      [WARNING] PPTX extraction error for {item_name}: {e}")
+                                import traceback
+                                traceback.print_exc()
+                        
+                        # If PPTX pipeline is disabled, fall through to normal processing (will skip with "Skipping binary file")
+                    
+                    # Download file content (for non-PPTX files, or if PPTX pipeline is disabled)
                     file_content = self.download_file_content(item_id_current, item_name)
                     
                     # If we couldn't download text content, create a document with enriched metadata context

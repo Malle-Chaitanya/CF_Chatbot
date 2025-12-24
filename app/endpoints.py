@@ -1166,13 +1166,16 @@ async def chat(request: Request, auth_user: dict = Depends(require_auth)):
                 
                 # ============ SOURCE PRIORITIZATION ============
                 # Boost SharePoint documents to prioritize internal documentation
+                from config import SHAREPOINT_SALES_PRIORITY
                 PRIORITIZE_SHAREPOINT = True  # Set to False to disable prioritization
                 SHAREPOINT_BOOST = 0.6  # Lower score = higher priority (0.6 = 40% boost)
+                SHAREPOINT_SALES_BOOST = 0.5  # Even higher priority for SharePoint Sales (0.5 = 50% boost)
                 EMAIL_BOOST = 0.8  # 20% boost for emails
                 
                 if PRIORITIZE_SHAREPOINT:
                     boosted_docs = []
                     sharepoint_count = 0
+                    sharepoint_sales_count = 0
                     email_count = 0
                     blog_count = 0
                     
@@ -1180,10 +1183,15 @@ async def chat(request: Request, auth_user: dict = Depends(require_auth)):
                         metadata = doc.metadata if hasattr(doc, 'metadata') else {}
                         tag = metadata.get('tag', '').lower()
                         source_type = metadata.get('source_type', '').lower()
+                        priority = metadata.get('priority', False)
                         
                         # Apply source-based boosting
                         adjusted_score = score
-                        if 'sharepoint' in tag or source_type == 'sharepoint':
+                        # Check SharePoint Sales first (highest priority)
+                        if ('sharepoint_sales' in tag or source_type == 'sharepoint_sales' or priority) and SHAREPOINT_SALES_PRIORITY:
+                            adjusted_score = score * SHAREPOINT_SALES_BOOST
+                            sharepoint_sales_count += 1
+                        elif 'sharepoint' in tag or source_type == 'sharepoint':
                             adjusted_score = score * SHAREPOINT_BOOST
                             sharepoint_count += 1
                         elif 'email' in tag or source_type == 'email' or 'outlook' in tag:
@@ -1198,7 +1206,7 @@ async def chat(request: Request, auth_user: dict = Depends(require_auth)):
                     boosted_docs.sort(key=lambda x: x[1])
                     doc_results = boosted_docs
                     
-                    print(f"[PRIORITIZATION] Boosted sources - SharePoint: {sharepoint_count}, Email: {email_count}, Blog: {blog_count}")
+                    print(f"[PRIORITIZATION] Boosted sources - SharePoint Sales: {sharepoint_sales_count}, SharePoint: {sharepoint_count}, Email: {email_count}, Blog: {blog_count}")
                 
                 # ============ HYBRID RANKING ============
                 # Combine semantic similarity with keyword matching
