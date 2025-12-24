@@ -54,7 +54,7 @@ TEAMS_STRUCTURE = {
         "color": "#10B981",  # Green
         "description": "Messaging & Email"
     },
-    "CF Manage": {
+    "CloudFuze Manage": {
         "lead": None,
         "lead_email": None,
         "members": [
@@ -66,7 +66,7 @@ TEAMS_STRUCTURE = {
             {"name": "Giridhar Kolavasi", "email": "giridhar.kolavasi@cloudfuze.com"},
         ],
         "color": "#F59E0B",  # Amber
-        "description": "CF Manage"
+        "description": "CloudFuze Manage"
     },
     "QA": {
         "lead": None,
@@ -238,6 +238,7 @@ TEAMS_STRUCTURE = {
             {"name": "Ranadeep Muddam", "email": "Ranadeep.Muddam@cloudfuze.com"},
             {"name": "Amulya Anapuram", "email": "Amulya.Anapuram@cloudfuze.com"},
             {"name": "Vijendar Burgula", "email": "Vijendar.Burgula@cloudfuze.com"},
+            {"name": "Saikumar Kustapuram", "email": "Saikumar.Kustapuram@cloudfuze.com"},
         ],
         "color": "#EC4899",  # Pink
         "description": "M5"
@@ -322,19 +323,29 @@ TEAMS_STRUCTURE = {
             {"name": "Sujana Manapuram", "email": "sujana.manapuram@cloudfuze.com"},
             {"name": "Madhuri Yeleswarapu", "email": "Madhuri.Yeleswarapu@cloudfuze.com"},
             {"name": "Pooja Parmar", "email": "pooja.parmar@cloudfuze.com"},
+            {"name": "Venu Gurrapu", "email": "venu.gurrapu@cloudfuze.com"},
         ],
         "color": "#3B82F6",  # Blue
         "description": "Human Resources"
     },
-    "Manager": {
+    "Consultant": {
         "lead": None,
         "lead_email": None,
         "members": [
-            {"name": "Raghavan Krishnan", "email": "Raghavan.Krishnan@cloudfuze.com"},
-            {"name": "Himansu Malla", "email": "Himansu.Malla@cloudfuze.com"},
+            {"name": "Raghavan Krishnan", "email": "Raghavan.Krishnan@cloudfuze.com"},  
         ],
-        "color": "#64748B",  # Slate Gray
-        "description": "Manager"
+        "color": "#F59E0B",  # Amber
+        "description": "Consultant"
+    },
+    "Customer Success": {
+        "lead": None,
+        "lead_email": None,
+        "members": [
+            {"name": "Himansu Malla", "email": "Himansu.Malla@cloudfuze.com"},  
+            {"name": "Ashim Upadhyay", "email": "Ashim.Upadhyay@cloudfuze.com"},
+        ],
+        "color": "#F59E0B",  # Amber
+        "description": "Customer Success"
     },
 }
 

@@ -1,0 +1,58 @@
+export const colorPalette = {
+  brand: {
+    primary: '#0129AC',
+    secondary: '#4A75E3',
+    tertiary: '#809EFC',
+    dark: '#254FC8',
+  },
+  background: {
+    page: '#F6F6F6',
+    panel: '#FFFFFF',
+    muted: '#F3F4F6',
+    soft: '#F9FAFB',
+    glow: '#E1ECFF',
+    border: '#E5E7EB',
+  },
+  typography: {
+    primary: '#000000',
+    secondary: '#2e2e2e',
+    muted: '#707070',
+    inverse: '#FFFFFF',
+  },
+  status: {
+    success: '#23E55F',
+    successAlt: '#20CC83',
+    info: '#3FD6F1',
+    error: '#FF1F1F',
+    warning: '#FFE836',
+  },
+  dashboard: {
+    filterActiveText: '#FFFFFF',
+    filterInactiveText: '#111827',
+    filterBorder: '#0129AC',
+    apply: '#23E55F',
+    applyDisabled: '#EBEBEB',
+  },
+  chart: {
+    combos: [
+      '#A100FF',
+      '#0065FF',
+      '#FE5833',
+      '#FF5CCE',
+      '#0ED380',
+      '#14FCF3',
+      '#3FD6F1',
+      '#A7DAFF',
+      '#F1F1F1',
+      '#EBEBEB',
+      '#23E55F',
+      '#FFE836',
+      '#FF1F1F',
+      '#F0114B',
+      '#262D3E',
+      '#B70945',
+      '#20CC83',
+    ],
+  },
+};
+
