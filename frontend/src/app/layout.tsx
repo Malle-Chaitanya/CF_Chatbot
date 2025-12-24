@@ -106,8 +106,11 @@ export default function RootLayout({
           {`
             (function() {
               const baseUrl = window.location.origin;
-              const cursorTree = baseUrl + "/images/Christmas Tree & Bulb Animated--cursor--SweezyCursors.png";
-              const cursorBulb = baseUrl + "/images/Christmas Tree & Bulb Animated--pointer--SweezyCursors.png";
+              // Properly encode the image filenames
+              const cursorTreeFile = encodeURIComponent("Christmas Tree & Bulb Animated--cursor--SweezyCursors.png");
+              const cursorBulbFile = encodeURIComponent("Christmas Tree & Bulb Animated--pointer--SweezyCursors.png");
+              const cursorTree = baseUrl + "/images/" + cursorTreeFile;
+              const cursorBulb = baseUrl + "/images/" + cursorBulbFile;
               
               document.documentElement.style.setProperty('--cursor-tree', 'url("' + cursorTree + '") 2 2, auto');
               document.documentElement.style.setProperty('--cursor-bulb', 'url("' + cursorBulb + '") 2 2, pointer');
