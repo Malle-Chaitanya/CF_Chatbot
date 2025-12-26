@@ -322,20 +322,31 @@ TEAMS_STRUCTURE = {
             {"name": "Sujana Manapuram", "email": "sujana.manapuram@cloudfuze.com"},
             {"name": "Madhuri Yeleswarapu", "email": "Madhuri.Yeleswarapu@cloudfuze.com"},
             {"name": "Pooja Parmar", "email": "pooja.parmar@cloudfuze.com"},
+             {"name": "Venu Gurrapu", "email": "venu.gurrapu@cloudfuze.com"},
         ],
         "color": "#3B82F6",  # Blue
         "description": "Human Resources"
     },
-    "Manager": {
+   "Consultant": {
         "lead": None,
         "lead_email": None,
         "members": [
-            {"name": "Raghavan Krishnan", "email": "Raghavan.Krishnan@cloudfuze.com"},
-            {"name": "Himansu Malla", "email": "Himansu.Malla@cloudfuze.com"},
+            {"name": "Raghavan Krishnan", "email": "Raghavan.Krishnan@cloudfuze.com"},  
         ],
-        "color": "#64748B",  # Slate Gray
-        "description": "Manager"
+        "color": "#F59E0B",  # Amber
+        "description": "Consultant"
     },
+    "Customer Success": {
+        "lead": None,
+        "lead_email": None,
+        "members": [
+            {"name": "Himansu Malla", "email": "Himansu.Malla@cloudfuze.com"},  
+            {"name": "Ashim Upadhyay", "email": "Ashim.Upadhyay@cloudfuze.com"},
+        ],
+        "color": "#F59E0B",  # Amber
+        "description": "Customer Success"
+    },
+    
 }
 
 

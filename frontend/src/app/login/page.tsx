@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Snowfall from 'react-snowfall';
 import { apiFetch } from '@/lib/api';
 import { checkSession } from '@/lib/session-utils';
-import Snowfall from 'react-snowfall';
+
 
 export default function LoginPage() {
   const router = useRouter();
