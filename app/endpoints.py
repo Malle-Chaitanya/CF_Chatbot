@@ -3047,7 +3047,7 @@ async def clear_corrected_responses(current_user: dict = Depends(require_admin))
 
 @router.get("/analytics/langfuse/teams/summary")
 async def get_teams_analytics_summary(
-    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
+    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|last_7_days|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
     """
@@ -3066,7 +3066,13 @@ async def get_teams_analytics_summary(
         import asyncio
         from datetime import datetime, timedelta, timezone
         
+        logger.info("[LANGFUSE ANALYTICS] ===== Teams Summary Request Started =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/teams/summary")
+        logger.info(f"[LANGFUSE ANALYTICS] Time Filter: {time_filter}")
+        logger.info(f"[LANGFUSE ANALYTICS] Requested by: {current_user.get('email', 'unknown')}")
+        
         if not langfuse_client:
+            logger.error("[LANGFUSE ANALYTICS] Langfuse client not initialized")
             return {"error": "Langfuse client not initialized", "status": "error"}
         
         # Calculate date range
@@ -3086,15 +3092,33 @@ async def get_teams_analytics_summary(
             start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
             end_time = now
         elif time_filter == "last_week":
+            days_since_monday = now.weekday()
+            last_monday = now - timedelta(days=days_since_monday + 7)
+            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_time = (last_monday + timedelta(days=6)).replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
+        elif time_filter == "last_7_days":
             start_time = now - timedelta(days=7)
             end_time = now
         else:
             start_time = None
             end_time = None
         
+        # Log time frame details
+        if start_time and end_time:
+            logger.info(f"[LANGFUSE ANALYTICS] Date Range: {start_time.isoformat()} to {end_time.isoformat()}")
+            logger.info(f"[LANGFUSE ANALYTICS] Time Span: {(end_time - start_time).total_seconds() / 86400:.2f} days")
+        else:
+            logger.info("[LANGFUSE ANALYTICS] Date Range: ALL (no time filter)")
+        
+        logger.info(f"[LANGFUSE ANALYTICS] Fetching: Team-wise analytics (activity, questions, member stats)")
+        
         # Initialize team data structure
         teams_data = {}
         all_teams = get_all_teams()
+        
+        logger.info(f"[LANGFUSE ANALYTICS] Total teams in system: {len(all_teams)}")
         
         for team_name, team_info in all_teams.items():
             teams_data[team_name] = {
@@ -3114,7 +3138,12 @@ async def get_teams_analytics_summary(
         batch_limit = 100
         max_pages = 10 if time_filter != "all" else 30
         
+        logger.info(f"[LANGFUSE ANALYTICS] Pagination: max_pages={max_pages}, batch_limit={batch_limit}")
+        
         async with httpx.AsyncClient() as client:
+            total_traces_fetched = 0
+            total_pages_fetched = 0
+            
             while page <= max_pages:
                 try:
                     params = {
@@ -3127,6 +3156,9 @@ async def get_teams_analytics_summary(
                     if end_time:
                         params["toTimestamp"] = end_time.isoformat()
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Fetching page {page}/{max_pages} from Langfuse API")
+                    logger.debug(f"[LANGFUSE ANALYTICS] API Request params: {params}")
+                    
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
@@ -3134,17 +3166,36 @@ async def get_teams_analytics_summary(
                         timeout=30.0
                     )
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] API Response: status={response.status_code}, page={page}")
+                        
                     if response.status_code == 429:
+                        logger.warning(f"[LANGFUSE ANALYTICS] Rate limited at page {page}, stopping pagination")
                         break
                     
                     if response.status_code != 200:
+                        logger.error(f"[LANGFUSE ANALYTICS] API error: status={response.status_code}, stopping at page {page}")
                         break
                     
                     traces_response = response.json()
                     traces = traces_response.get("data", [])
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Page {page}: Received {len(traces)} traces")
+                    total_traces_fetched += len(traces)
+                    total_pages_fetched = page
+                    
                     if not traces:
+                        logger.info(f"[LANGFUSE ANALYTICS] No more traces at page {page}, stopping pagination")
                         break
+                    
+                    # Log sample traces for debugging
+                    for trace in traces[:3]:
+                        metadata = trace.get("metadata", {})
+                        logger.debug(
+                            "[LANGFUSE ANALYTICS] Trace sample - id=%s email=%s question=%s",
+                            trace.get("id"),
+                            metadata.get("user_email"),
+                            str(trace.get("input", ""))[:50] + "..." if len(str(trace.get("input", ""))) > 50 else trace.get("input", ""),
+                        )
                     
                     # Process traces and assign to teams
                     for trace in traces:
@@ -3153,25 +3204,30 @@ async def get_teams_analytics_summary(
                         question = trace.get("input", "")
                         
                         if user_email:
-                            # Find which team this user belongs to
                             user_email_str = str(user_email) if isinstance(user_email, list) else user_email
-                            team_name = get_team_by_member_email(user_email_str)
-                            
+                            normalized_email = user_email_str.lower().strip()
+                            if not normalized_email:
+                                continue
+                            team_name = get_team_by_member_email(normalized_email)
+                                
                             if team_name in teams_data:
-                                teams_data[team_name]["active_members"].add(user_email_str)
+                                teams_data[team_name]["active_members"].add(normalized_email)
                                 
                                 if question:
                                     teams_data[team_name]["total_questions"] += 1
                                     teams_data[team_name]["questions_list"].append(str(question))
                     
                     if len(traces) < batch_limit:
+                        logger.info(f"[LANGFUSE ANALYTICS] Last page reached (received {len(traces)} < {batch_limit} traces)")
                         break
                     
                     page += 1
                     await asyncio.sleep(0.5)
                     
                 except Exception as e:
-                    print(f"[ERROR] Error fetching traces: {e}")
+                    logger.error(f"[LANGFUSE ANALYTICS] Error fetching traces at page {page}: {e}")
+                    import traceback
+                    logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
                     break
         
         # Calculate unique questions and top questions per team
@@ -3202,18 +3258,31 @@ async def get_teams_analytics_summary(
         # Sort by total questions (descending)
         team_stats.sort(key=lambda x: x["total_questions"], reverse=True)
         
+        total_questions = sum(t["total_questions"] for t in team_stats)
+        total_active_teams = sum(1 for t in team_stats if t["total_questions"] > 0)
+        
+        # Log summary
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Teams Summary Results =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Total pages fetched: {total_pages_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total traces fetched: {total_traces_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total teams: {len(team_stats)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Active teams (with questions): {total_active_teams}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total questions across all teams: {total_questions}")
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Teams Summary Request Completed =====")
+        
         return {
             "status": "success",
             "time_filter": time_filter,
             "teams": team_stats,
             "total_teams": len(team_stats),
-            "total_questions": sum(t["total_questions"] for t in team_stats),
-            "total_active_teams": sum(1 for t in team_stats if t["total_questions"] > 0)
+            "total_questions": total_questions,
+            "total_active_teams": total_active_teams
         }
         
     except Exception as e:
-        print(f"[ERROR] Teams analytics fetch failed: {e}")
+        logger.error(f"[LANGFUSE ANALYTICS] Teams analytics fetch failed: {e}")
         import traceback
+        logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
         traceback.print_exc()
         return {"error": str(e), "status": "error"}
 
@@ -3221,7 +3290,7 @@ async def get_teams_analytics_summary(
 @router.get("/analytics/langfuse/teams/details")
 async def get_team_details(
     team_name: str = Query(..., description="Team name"),
-    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
+    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|last_7_days|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
     """
@@ -3239,13 +3308,23 @@ async def get_team_details(
         import asyncio
         from datetime import datetime, timedelta, timezone
         
+        logger.info("[LANGFUSE ANALYTICS] ===== Team Details Request Started =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/teams/details")
+        logger.info(f"[LANGFUSE ANALYTICS] Team Name: {team_name}")
+        logger.info(f"[LANGFUSE ANALYTICS] Time Filter: {time_filter}")
+        logger.info(f"[LANGFUSE ANALYTICS] Requested by: {current_user.get('email', 'unknown')}")
+        
         if not langfuse_client:
+            logger.error("[LANGFUSE ANALYTICS] Langfuse client not initialized")
             return {"error": "Langfuse client not initialized", "status": "error"}
         
         # Get team info
         team_info = get_team_by_name(team_name)
         if not team_info:
+            logger.error(f"[LANGFUSE ANALYTICS] Team '{team_name}' not found")
             return {"error": f"Team '{team_name}' not found", "status": "error"}
+        
+        logger.info(f"[LANGFUSE ANALYTICS] Team found: {team_name} with {len(team_info.get('members', []))} members")
         
         # Calculate date range
         now = datetime.now(timezone.utc)
@@ -3264,11 +3343,27 @@ async def get_team_details(
             start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
             end_time = now
         elif time_filter == "last_week":
+            days_since_monday = now.weekday()
+            last_monday = now - timedelta(days=days_since_monday + 7)
+            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_time = (last_monday + timedelta(days=6)).replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
+        elif time_filter == "last_7_days":
             start_time = now - timedelta(days=7)
             end_time = now
         else:
             start_time = None
             end_time = None
+        
+        # Log time frame details
+        if start_time and end_time:
+            logger.info(f"[LANGFUSE ANALYTICS] Date Range: {start_time.isoformat()} to {end_time.isoformat()}")
+            logger.info(f"[LANGFUSE ANALYTICS] Time Span: {(end_time - start_time).total_seconds() / 86400:.2f} days")
+        else:
+            logger.info("[LANGFUSE ANALYTICS] Date Range: ALL (no time filter)")
+        
+        logger.info(f"[LANGFUSE ANALYTICS] Fetching: Team details (member stats, questions, engagement)")
         
         # Initialize member stats
         member_stats = {}
@@ -3303,7 +3398,13 @@ async def get_team_details(
         batch_limit = 100
         max_pages = 10 if time_filter != "all" else 20
         
+        logger.info(f"[LANGFUSE ANALYTICS] Pagination: max_pages={max_pages}, batch_limit={batch_limit}")
+        logger.info(f"[LANGFUSE ANALYTICS] Team member emails to filter: {len(team_emails)}")
+        
         async with httpx.AsyncClient() as client:
+            total_traces_fetched = 0
+            total_pages_fetched = 0
+            
             while page <= max_pages:
                 try:
                     params = {
@@ -3316,6 +3417,9 @@ async def get_team_details(
                     if end_time:
                         params["toTimestamp"] = end_time.isoformat()
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Fetching page {page}/{max_pages} from Langfuse API for team {team_name}")
+                    logger.debug(f"[LANGFUSE ANALYTICS] API Request params: {params}")
+                    
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
@@ -3323,18 +3427,38 @@ async def get_team_details(
                         timeout=30.0
                     )
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] API Response: status={response.status_code}, page={page}")
+                        
                     if response.status_code == 429:
+                        logger.warning(f"[LANGFUSE ANALYTICS] Rate limited at page {page}, stopping pagination")
                         break
                     
                     if response.status_code != 200:
+                        logger.error(f"[LANGFUSE ANALYTICS] API error: status={response.status_code}, stopping at page {page}")
                         break
                     
                     traces_response = response.json()
                     traces = traces_response.get("data", [])
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Page {page}: Received {len(traces)} traces")
+                    total_traces_fetched += len(traces)
+                    total_pages_fetched = page
+                    
                     if not traces:
+                        logger.info(f"[LANGFUSE ANALYTICS] No more traces at page {page}, stopping pagination")
                         break
                     
+                    # Log sample traces for debugging
+                    for trace in traces[:3]:
+                        metadata = trace.get("metadata", {})
+                        logger.debug(
+                            "[LANGFUSE ANALYTICS] Trace sample - team=%s id=%s email=%s question=%s",
+                            team_name,
+                            trace.get("id"),
+                            metadata.get("user_email"),
+                            str(trace.get("input", ""))[:50] + "..." if len(str(trace.get("input", ""))) > 50 else trace.get("input", ""),
+                        )
+                
                     # Process traces
                     for trace in traces:
                         metadata = trace.get("metadata", {})
@@ -3351,13 +3475,16 @@ async def get_team_details(
                                     member_stats[user_email_str]["questions"].append(str(question))
                     
                     if len(traces) < batch_limit:
+                        logger.info(f"[LANGFUSE ANALYTICS] Last page reached (received {len(traces)} < {batch_limit} traces)")
                         break
                     
                     page += 1
                     await asyncio.sleep(0.5)
                     
                 except Exception as e:
-                    print(f"[ERROR] Error fetching team traces: {e}")
+                    logger.error(f"[LANGFUSE ANALYTICS] Error fetching team traces at page {page}: {e}")
+                    import traceback
+                    logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
                     break
         
         # Calculate top questions per member and sort
@@ -3380,6 +3507,19 @@ async def get_team_details(
         # Sort by total questions
         members_list.sort(key=lambda x: x["total_questions"], reverse=True)
         
+        active_members = sum(1 for m in members_list if m["total_questions"] > 0)
+        team_total_questions = sum(m["total_questions"] for m in members_list)
+        
+        # Log summary
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Team Details Results =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Total pages fetched: {total_pages_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total traces fetched: {total_traces_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Team: {team_name}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total members: {len(members_list)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Active members: {active_members}")
+        logger.info(f"[LANGFUSE ANALYTICS] Team total questions: {team_total_questions}")
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Team Details Request Completed =====")
+        
         return {
             "status": "success",
             "team_name": team_name,
@@ -3389,21 +3529,22 @@ async def get_team_details(
             "time_filter": time_filter,
             "members": members_list,
             "total_members": len(members_list),
-            "active_members": sum(1 for m in members_list if m["total_questions"] > 0),
-            "team_total_questions": sum(m["total_questions"] for m in members_list),
+            "active_members": active_members,
+            "team_total_questions": team_total_questions,
             "team_unique_questions": len(set(q for m in members_list for q in m.get("questions", [])))
         }
         
     except Exception as e:
-        print(f"[ERROR] Team details fetch failed: {e}")
+        logger.error(f"[LANGFUSE ANALYTICS] Team details fetch failed: {e}")
         import traceback
+        logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
         traceback.print_exc()
         return {"error": str(e), "status": "error"}
 
 
 @router.get("/analytics/langfuse/dashboard-summary")
 async def get_langfuse_dashboard_summary(
-    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
+    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|last_7_days|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
     """
@@ -3413,7 +3554,8 @@ async def get_langfuse_dashboard_summary(
     - today: Today's data only
     - yesterday: Yesterday's data only
     - this_week: Current week data (Monday to Sunday)
-    - last_week: Last 7 days
+    - last_week: Previous calendar week (Monday to Sunday of last week)
+    - last_7_days: Rolling 7 days from now
     - all: All available data (default limit 3000 traces)
     
     Returns:
@@ -3427,7 +3569,13 @@ async def get_langfuse_dashboard_summary(
         import asyncio
         from datetime import datetime, timedelta, timezone
         
+        logger.info("[LANGFUSE ANALYTICS] ===== Dashboard Summary Request Started =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/dashboard-summary")
+        logger.info(f"[LANGFUSE ANALYTICS] Time Filter: {time_filter}")
+        logger.info(f"[LANGFUSE ANALYTICS] Requested by: {current_user.get('email', 'unknown')}")
+        
         if not langfuse_client:
+            logger.error("[LANGFUSE ANALYTICS] Langfuse client not initialized")
             return {"error": "Langfuse client not initialized", "status": "error"}
         
         # Calculate date range based on filter
@@ -3448,12 +3596,30 @@ async def get_langfuse_dashboard_summary(
             start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
             end_time = now
         elif time_filter == "last_week":
-            # Last 7 days
+            # Previous calendar week (Monday to Sunday of last week)
+            days_since_monday = now.weekday()
+            # Go back to last Monday
+            last_monday = now - timedelta(days=days_since_monday + 7)
+            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            # Last Sunday (end of last week)
+            end_time = last_monday + timedelta(days=6)
+            end_time = end_time.replace(hour=23, minute=59, second=59, microsecond=999999)
+        elif time_filter == "last_7_days":
+            # Rolling 7 days
             start_time = now - timedelta(days=7)
             end_time = now
         else:  # "all"
             start_time = None
             end_time = None
+        
+        # Log time frame details
+        if start_time and end_time:
+            logger.info(f"[LANGFUSE ANALYTICS] Date Range: {start_time.isoformat()} to {end_time.isoformat()}")
+            logger.info(f"[LANGFUSE ANALYTICS] Time Span: {(end_time - start_time).total_seconds() / 86400:.2f} days")
+        else:
+            logger.info("[LANGFUSE ANALYTICS] Date Range: ALL (no time filter)")
+        
+        logger.info(f"[LANGFUSE ANALYTICS] Fetching: Dashboard summary (users, questions, top users, top questions)")
         
         users_activity = defaultdict(lambda: {"count": 0, "email": "", "name": ""})
         all_questions = []
@@ -3462,8 +3628,13 @@ async def get_langfuse_dashboard_summary(
         batch_limit = 100
         max_pages = 10 if time_filter != "all" else 30  # Faster for filtered queries
         
+        logger.info(f"[LANGFUSE ANALYTICS] Pagination: max_pages={max_pages}, batch_limit={batch_limit}")
+        
         async with httpx.AsyncClient() as client:
             from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
+            
+            total_traces_fetched = 0
+            total_pages_fetched = 0
             
             while page <= max_pages:
                 try:
@@ -3479,6 +3650,9 @@ async def get_langfuse_dashboard_summary(
                     if end_time:
                         params["toTimestamp"] = end_time.isoformat()
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Fetching page {page}/{max_pages} from Langfuse API")
+                    logger.debug(f"[LANGFUSE ANALYTICS] API Request params: {params}")
+                    
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
@@ -3486,17 +3660,25 @@ async def get_langfuse_dashboard_summary(
                         timeout=30.0  # Reduced timeout for filtered queries
                     )
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] API Response: status={response.status_code}, page={page}")
+                    
                     if response.status_code == 429:  # Rate limited
-                        print(f"[WARNING] Langfuse rate limited, stopping pagination at page {page}")
+                        logger.warning(f"[LANGFUSE ANALYTICS] Rate limited at page {page}, stopping pagination")
                         break
                     
                     if response.status_code != 200:
+                        logger.error(f"[LANGFUSE ANALYTICS] API error: status={response.status_code}, stopping at page {page}")
                         break
                     
                     traces_response = response.json()
                     traces = traces_response.get("data", [])
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Page {page}: Received {len(traces)} traces")
+                    total_traces_fetched += len(traces)
+                    total_pages_fetched = page
+                    
                     if not traces:
+                        logger.info(f"[LANGFUSE ANALYTICS] No more traces at page {page}, stopping pagination")
                         break
                     
                     for trace in traces:
@@ -3522,12 +3704,15 @@ async def get_langfuse_dashboard_summary(
                             all_questions.append(str(question))
                     
                     if len(traces) < batch_limit:
+                        logger.info(f"[LANGFUSE ANALYTICS] Last page reached (received {len(traces)} < {batch_limit} traces)")
                         break
                     
                     page += 1
                     await asyncio.sleep(0.5)  # Rate limiting delay
                 except Exception as e:
-                    print(f"[ERROR] Langfuse API error: {e}")
+                    logger.error(f"[LANGFUSE ANALYTICS] API error at page {page}: {e}")
+                    import traceback
+                    logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
                     break
         
         # Get most active users (top 10)
@@ -3542,8 +3727,19 @@ async def get_langfuse_dashboard_summary(
             question_counter = Counter(all_questions)
             top_questions = question_counter.most_common(5)
         except Exception as e:
-            print(f"[ERROR] Counter error: {e}")
+            logger.error(f"[LANGFUSE ANALYTICS] Counter error: {e}")
             top_questions = []
+        
+        # Log summary
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Dashboard Summary Results =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Total pages fetched: {total_pages_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total traces fetched: {total_traces_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total unique users: {len(users_activity)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total questions: {len(all_questions)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Unique questions: {len(question_counter) if 'question_counter' in locals() else 0}")
+        logger.info(f"[LANGFUSE ANALYTICS] Most active users (top 10): {len(most_active)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Top questions (top 5): {len(top_questions)}")
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Dashboard Summary Request Completed =====")
         
         return {
             "status": "success",
@@ -3572,13 +3768,15 @@ async def get_langfuse_dashboard_summary(
         }
     
     except Exception as e:
-        print(f"[ERROR] Dashboard summary fetch failed: {e}")
+        logger.error(f"[LANGFUSE ANALYTICS] Dashboard summary fetch failed: {e}")
+        import traceback
+        logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
         return {"error": str(e), "status": "error"}
 
 
 @router.get("/analytics/langfuse/users")
 async def get_langfuse_users_analytics(
-    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
+    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|last_7_days|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
     """
@@ -3588,7 +3786,8 @@ async def get_langfuse_users_analytics(
     - today: Today's data only
     - yesterday: Yesterday's data only
     - this_week: Current week data
-    - last_week: Last 7 days
+    - last_week: Previous calendar week (Monday to Sunday of last week)
+    - last_7_days: Rolling 7 days from now
     - all: All available data
     
     Returns:
@@ -3603,7 +3802,13 @@ async def get_langfuse_users_analytics(
         import asyncio
         from datetime import datetime, timedelta, timezone
         
+        logger.info("[LANGFUSE ANALYTICS] ===== Users Analytics Request Started =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/users")
+        logger.info(f"[LANGFUSE ANALYTICS] Time Filter: {time_filter}")
+        logger.info(f"[LANGFUSE ANALYTICS] Requested by: {current_user.get('email', 'unknown')}")
+        
         if not langfuse_client:
+            logger.error("[LANGFUSE ANALYTICS] Langfuse client not initialized")
             return {
                 "error": "Langfuse client not initialized",
                 "status": "error"
@@ -3626,18 +3831,39 @@ async def get_langfuse_users_analytics(
             start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
             end_time = now
         elif time_filter == "last_week":
+            days_since_monday = now.weekday()
+            last_monday = now - timedelta(days=days_since_monday + 7)
+            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_time = (last_monday + timedelta(days=6)).replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
+        elif time_filter == "last_7_days":
             start_time = now - timedelta(days=7)
             end_time = now
         else:
             start_time = None
             end_time = None
         
+        # Log time frame details
+        if start_time and end_time:
+            logger.info(f"[LANGFUSE ANALYTICS] Date Range: {start_time.isoformat()} to {end_time.isoformat()}")
+            logger.info(f"[LANGFUSE ANALYTICS] Time Span: {(end_time - start_time).total_seconds() / 86400:.2f} days")
+        else:
+            logger.info("[LANGFUSE ANALYTICS] Date Range: ALL (no time filter)")
+        
+        logger.info(f"[LANGFUSE ANALYTICS] Fetching: All users with their analytics (questions, top questions, activity)")
+        
         users_data = {}
         page = 1
         limit = 100
         max_pages = 10 if time_filter != "all" else 30  # Faster for filtered queries
         
+        logger.info(f"[LANGFUSE ANALYTICS] Pagination: max_pages={max_pages}, limit={limit}")
+        
         async with httpx.AsyncClient() as client:
+            total_traces_fetched = 0
+            total_pages_fetched = 0
+            
             while page <= max_pages:
                 try:
                     # Fetch traces with pagination and date filter
@@ -3651,6 +3877,9 @@ async def get_langfuse_users_analytics(
                     if end_time:
                         params["toTimestamp"] = end_time.isoformat()
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Fetching page {page}/{max_pages} from Langfuse API")
+                    logger.debug(f"[LANGFUSE ANALYTICS] API Request params: {params}")
+                    
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
@@ -3658,18 +3887,25 @@ async def get_langfuse_users_analytics(
                         timeout=30.0  # Reduced timeout
                     )
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] API Response: status={response.status_code}, page={page}")
+                    
                     if response.status_code == 429:  # Rate limited
-                        print(f"[WARNING] Langfuse rate limited at page {page}, stopping")
+                        logger.warning(f"[LANGFUSE ANALYTICS] Rate limited at page {page}, stopping")
                         break
                     
                     if response.status_code != 200:
-                        print(f"[ERROR] Langfuse API error: {response.status_code}")
+                        logger.error(f"[LANGFUSE ANALYTICS] API error: status={response.status_code}, stopping at page {page}")
                         break
                     
                     traces_response = response.json()
                     traces = traces_response.get("data", [])
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Page {page}: Received {len(traces)} traces")
+                    total_traces_fetched += len(traces)
+                    total_pages_fetched = page
+                    
                     if not traces:
+                        logger.info(f"[LANGFUSE ANALYTICS] No more traces at page {page}, stopping pagination")
                         break
                     
                     # Process each trace
@@ -3720,12 +3956,15 @@ async def get_langfuse_users_analytics(
                     
                     # Check if there are more pages
                     if len(traces) < limit:
+                        logger.info(f"[LANGFUSE ANALYTICS] Last page reached (received {len(traces)} < {limit} traces)")
                         break
                     
                     page += 1
                     await asyncio.sleep(0.5)  # Rate limiting delay
                 except Exception as e:
-                    print(f"[ERROR] Error fetching traces: {e}")
+                    logger.error(f"[LANGFUSE ANALYTICS] Error fetching traces at page {page}: {e}")
+                    import traceback
+                    logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
                     break
         
         # Process data - find top questions
@@ -3755,10 +3994,20 @@ async def get_langfuse_users_analytics(
             dept = user_info["metadata"].get("department", "Unassigned")
             users_by_department[dept].append(user_info)
         
+        # Log summary
+        total_questions = sum(u["total_questions"] for u in users_data.values())
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Users Analytics Results =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Total pages fetched: {total_pages_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total traces fetched: {total_traces_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total unique users: {len(users_data)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total questions: {total_questions}")
+        logger.info(f"[LANGFUSE ANALYTICS] Departments found: {len(users_by_department)}")
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Users Analytics Request Completed =====")
+        
         return {
             "status": "success",
             "total_users": len(users_data),
-            "total_questions": sum(u["total_questions"] for u in users_data.values()),
+            "total_questions": total_questions,
             "users": list(users_data.values()),
             "users_by_department": dict(users_by_department),
             "department_summary": {
@@ -3771,8 +4020,9 @@ async def get_langfuse_users_analytics(
         }
     
     except Exception as e:
-        print(f"[ERROR] Analytics fetch failed: {e}")
+        logger.error(f"[LANGFUSE ANALYTICS] Users analytics fetch failed: {e}")
         import traceback
+        logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
         traceback.print_exc()
         return {
             "error": str(e),
@@ -3783,7 +4033,7 @@ async def get_langfuse_users_analytics(
 @router.get("/analytics/langfuse/users/{user_id}")
 async def get_user_langfuse_analytics(
     user_id: str,
-    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
+    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|last_7_days|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
     """
@@ -3793,7 +4043,8 @@ async def get_user_langfuse_analytics(
     - today: Today's data only
     - yesterday: Yesterday's data only
     - this_week: Current week data
-    - last_week: Last 7 days
+    - last_week: Previous calendar week (Monday to Sunday of last week)
+    - last_7_days: Rolling 7 days from now
     - all: All available data
     
     Returns:
@@ -3807,7 +4058,14 @@ async def get_user_langfuse_analytics(
         import asyncio
         from datetime import datetime, timedelta, timezone
         
+        logger.info("[LANGFUSE ANALYTICS] ===== User Analytics Request Started =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/users/{user_id}")
+        logger.info(f"[LANGFUSE ANALYTICS] User ID: {user_id}")
+        logger.info(f"[LANGFUSE ANALYTICS] Time Filter: {time_filter}")
+        logger.info(f"[LANGFUSE ANALYTICS] Requested by: {current_user.get('email', 'unknown')}")
+        
         if not langfuse_client:
+            logger.error("[LANGFUSE ANALYTICS] Langfuse client not initialized")
             return {"error": "Langfuse client not initialized"}
         
         # Calculate date range
@@ -3827,18 +4085,39 @@ async def get_user_langfuse_analytics(
             start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
             end_time = now
         elif time_filter == "last_week":
+            days_since_monday = now.weekday()
+            last_monday = now - timedelta(days=days_since_monday + 7)
+            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_time = (last_monday + timedelta(days=6)).replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
+        elif time_filter == "last_7_days":
             start_time = now - timedelta(days=7)
             end_time = now
         else:
             start_time = None
             end_time = None
         
+        # Log time frame details
+        if start_time and end_time:
+            logger.info(f"[LANGFUSE ANALYTICS] Date Range: {start_time.isoformat()} to {end_time.isoformat()}")
+            logger.info(f"[LANGFUSE ANALYTICS] Time Span: {(end_time - start_time).total_seconds() / 86400:.2f} days")
+        else:
+            logger.info("[LANGFUSE ANALYTICS] Date Range: ALL (no time filter)")
+        
+        logger.info(f"[LANGFUSE ANALYTICS] Fetching: User-specific analytics (questions, answers, activity timeline)")
+        
         user_traces = []
         page = 1
         limit = 100
         max_pages = 10 if time_filter != "all" else 20  # Faster for filtered queries
         
+        logger.info(f"[LANGFUSE ANALYTICS] Pagination: max_pages={max_pages}, limit={limit}")
+        
         async with httpx.AsyncClient() as client:
+            total_traces_fetched = 0
+            total_pages_fetched = 0
+            
             while page <= max_pages:
                 try:
                     params = {
@@ -3852,6 +4131,9 @@ async def get_user_langfuse_analytics(
                     if end_time:
                         params["toTimestamp"] = end_time.isoformat()
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Fetching page {page}/{max_pages} from Langfuse API for user {user_id}")
+                    logger.debug(f"[LANGFUSE ANALYTICS] API Request params: {params}")
+                    
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
@@ -3859,28 +4141,39 @@ async def get_user_langfuse_analytics(
                         timeout=30.0  # Reduced timeout
                     )
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] API Response: status={response.status_code}, page={page}")
+                    
                     if response.status_code == 429:  # Rate limited
-                        print(f"[WARNING] Langfuse rate limited at page {page}")
+                        logger.warning(f"[LANGFUSE ANALYTICS] Rate limited at page {page}, stopping")
                         break
                     
                     if response.status_code != 200:
+                        logger.error(f"[LANGFUSE ANALYTICS] API error: status={response.status_code}, stopping at page {page}")
                         break
                     
                     traces_response = response.json()
                     traces = traces_response.get("data", [])
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Page {page}: Received {len(traces)} traces for user {user_id}")
+                    total_traces_fetched += len(traces)
+                    total_pages_fetched = page
+                    
                     if not traces:
+                        logger.info(f"[LANGFUSE ANALYTICS] No more traces at page {page}, stopping pagination")
                         break
                     
                     user_traces.extend(traces)
                     
                     if len(traces) < limit:
+                        logger.info(f"[LANGFUSE ANALYTICS] Last page reached (received {len(traces)} < {limit} traces)")
                         break
                     
                     page += 1
                     await asyncio.sleep(0.5)  # Rate limiting delay
                 except Exception as e:
-                    print(f"[ERROR] Error fetching user traces: {e}")
+                    logger.error(f"[LANGFUSE ANALYTICS] Error fetching user traces at page {page}: {e}")
+                    import traceback
+                    logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
                     break
         
         # Aggregate data
@@ -3914,7 +4207,7 @@ async def get_user_langfuse_analytics(
             question_counter = Counter([q["question"] for q in questions_list])
             top_questions = question_counter.most_common(10)
         except Exception as e:
-            print(f"[ERROR] Counter error: {e}")
+            logger.error(f"[LANGFUSE ANALYTICS] Counter error: {e}")
             top_questions = []
         
         # Get user info from first trace
@@ -3924,6 +4217,15 @@ async def get_user_langfuse_analytics(
             metadata = user_traces[0].get("metadata", {})
             user_email = metadata.get("user_email", "N/A")
             user_name = metadata.get("user_name", "Unknown")
+        
+        # Log summary
+        logger.info(f"[LANGFUSE ANALYTICS] ===== User Analytics Results =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Total pages fetched: {total_pages_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total traces fetched: {total_traces_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] User: {user_name} ({user_email})")
+        logger.info(f"[LANGFUSE ANALYTICS] Total questions: {len(questions_list)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Top questions (top 10): {len(top_questions)}")
+        logger.info(f"[LANGFUSE ANALYTICS] ===== User Analytics Request Completed =====")
         
         return {
             "status": "success",
@@ -3951,7 +4253,7 @@ async def get_user_langfuse_analytics(
 @router.get("/analytics/langfuse/top-questions")
 async def get_top_questions_global(
     limit: int = Query(20, ge=1, le=100),
-    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|all"),
+    time_filter: str = Query("today", description="today|yesterday|this_week|last_week|last_7_days|all"),
     current_user: dict = Depends(require_restricted_admin)
 ):
     """
@@ -3962,7 +4264,8 @@ async def get_top_questions_global(
     - today: Today's data only
     - yesterday: Yesterday's data only
     - this_week: Current week data
-    - last_week: Last 7 days
+    - last_week: Previous calendar week (Monday to Sunday of last week)
+    - last_7_days: Rolling 7 days from now
     - all: All available data
     """
     try:
@@ -3971,7 +4274,14 @@ async def get_top_questions_global(
         import asyncio
         from datetime import datetime, timedelta, timezone
         
+        logger.info("[LANGFUSE ANALYTICS] ===== Top Questions Request Started =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/top-questions")
+        logger.info(f"[LANGFUSE ANALYTICS] Limit: {limit}")
+        logger.info(f"[LANGFUSE ANALYTICS] Time Filter: {time_filter}")
+        logger.info(f"[LANGFUSE ANALYTICS] Requested by: {current_user.get('email', 'unknown')}")
+        
         if not langfuse_client:
+            logger.error("[LANGFUSE ANALYTICS] Langfuse client not initialized")
             return {"error": "Langfuse client not initialized"}
         
         # Calculate date range
@@ -3991,18 +4301,39 @@ async def get_top_questions_global(
             start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
             end_time = now
         elif time_filter == "last_week":
+            days_since_monday = now.weekday()
+            last_monday = now - timedelta(days=days_since_monday + 7)
+            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_time = (last_monday + timedelta(days=6)).replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
+        elif time_filter == "last_7_days":
             start_time = now - timedelta(days=7)
             end_time = now
         else:
             start_time = None
             end_time = None
         
+        # Log time frame details
+        if start_time and end_time:
+            logger.info(f"[LANGFUSE ANALYTICS] Date Range: {start_time.isoformat()} to {end_time.isoformat()}")
+            logger.info(f"[LANGFUSE ANALYTICS] Time Span: {(end_time - start_time).total_seconds() / 86400:.2f} days")
+        else:
+            logger.info("[LANGFUSE ANALYTICS] Date Range: ALL (no time filter)")
+        
+        logger.info(f"[LANGFUSE ANALYTICS] Fetching: Top {limit} questions across all users")
+        
         all_questions = []
         page = 1
         batch_limit = 100
         max_pages = 10 if time_filter != "all" else 30  # Faster for filtered queries
         
+        logger.info(f"[LANGFUSE ANALYTICS] Pagination: max_pages={max_pages}, batch_limit={batch_limit}")
+        
         async with httpx.AsyncClient() as client:
+            total_traces_fetched = 0
+            total_pages_fetched = 0
+            
             while page <= max_pages:
                 try:
                     params = {
@@ -4015,6 +4346,9 @@ async def get_top_questions_global(
                     if end_time:
                         params["toTimestamp"] = end_time.isoformat()
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Fetching page {page}/{max_pages} from Langfuse API")
+                    logger.debug(f"[LANGFUSE ANALYTICS] API Request params: {params}")
+                    
                     response = await client.get(
                         f"{LANGFUSE_HOST}/api/public/traces",
                         params=params,
@@ -4022,17 +4356,25 @@ async def get_top_questions_global(
                         timeout=30.0  # Reduced timeout
                     )
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] API Response: status={response.status_code}, page={page}")
+                    
                     if response.status_code == 429:  # Rate limited
-                        print(f"[WARNING] Langfuse rate limited at page {page}, stopping")
+                        logger.warning(f"[LANGFUSE ANALYTICS] Rate limited at page {page}, stopping")
                         break
                     
                     if response.status_code != 200:
+                        logger.error(f"[LANGFUSE ANALYTICS] API error: status={response.status_code}, stopping at page {page}")
                         break
                     
                     traces_response = response.json()
                     traces = traces_response.get("data", [])
                     
+                    logger.info(f"[LANGFUSE ANALYTICS] Page {page}: Received {len(traces)} traces")
+                    total_traces_fetched += len(traces)
+                    total_pages_fetched = page
+                    
                     if not traces:
+                        logger.info(f"[LANGFUSE ANALYTICS] No more traces at page {page}, stopping pagination")
                         break
                     
                     for trace in traces:
@@ -4041,12 +4383,15 @@ async def get_top_questions_global(
                             all_questions.append(str(question))
                     
                     if len(traces) < batch_limit:
+                        logger.info(f"[LANGFUSE ANALYTICS] Last page reached (received {len(traces)} < {batch_limit} traces)")
                         break
                     
                     page += 1
                     await asyncio.sleep(0.5)  # Rate limiting delay
                 except Exception as e:
-                    print(f"[ERROR] Error fetching traces: {e}")
+                    logger.error(f"[LANGFUSE ANALYTICS] Error fetching traces at page {page}: {e}")
+                    import traceback
+                    logger.error(f"[LANGFUSE ANALYTICS] Traceback: {traceback.format_exc()}")
                     break
         
         # Get top questions
@@ -4054,8 +4399,18 @@ async def get_top_questions_global(
             question_counter = Counter(all_questions)
             top_questions = question_counter.most_common(limit)
         except Exception as e:
-            print(f"[ERROR] Counter error: {e}")
+            logger.error(f"[LANGFUSE ANALYTICS] Counter error: {e}")
             top_questions = []
+            question_counter = Counter()
+        
+        # Log summary
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Top Questions Results =====")
+        logger.info(f"[LANGFUSE ANALYTICS] Total pages fetched: {total_pages_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total traces fetched: {total_traces_fetched}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total questions asked: {len(all_questions)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Total unique questions: {len(question_counter)}")
+        logger.info(f"[LANGFUSE ANALYTICS] Top questions returned: {len(top_questions)}")
+        logger.info(f"[LANGFUSE ANALYTICS] ===== Top Questions Request Completed =====")
         
         return {
             "status": "success",
@@ -4912,6 +5267,13 @@ async def get_langfuse_teams_summary(
             max_pages = 15
             request_timeout = 45.0
         elif time_filter == "last_week":
+            utc_now = datetime.utcnow()
+            days_since_monday = utc_now.weekday()
+            last_monday = utc_now - timedelta(days=days_since_monday + 7)
+            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            max_pages = 20
+            request_timeout = 45.0
+        elif time_filter == "last_7_days":
             start_time = datetime.utcnow() - timedelta(days=7)
             max_pages = 20
             request_timeout = 45.0
@@ -5156,6 +5518,13 @@ async def get_langfuse_team_details(
             max_pages = 15
             request_timeout = 45.0
         elif time_filter == "last_week":
+            utc_now = datetime.utcnow()
+            days_since_monday = utc_now.weekday()
+            last_monday = utc_now - timedelta(days=days_since_monday + 7)
+            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
+            max_pages = 20
+            request_timeout = 45.0
+        elif time_filter == "last_7_days":
             start_time = datetime.utcnow() - timedelta(days=7)
             max_pages = 20
             request_timeout = 45.0

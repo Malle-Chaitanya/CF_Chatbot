@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getCurrentUser, checkSession } from '@/lib/session-utils';
-import { apiFetch, getApiBase } from '@/lib/api';
 
 export default function SharedChatPage() {
   const router = useRouter();
@@ -86,13 +85,14 @@ export default function SharedChatPage() {
         console.log('[SHARED] Loading shared chat with token:', shareToken);
         
         // Log the API endpoint being called
-        const apiBase = getApiBase();
-        const apiUrl = `${apiBase}/chat/shared/${shareToken}`;
-        console.log('[SHARED] Calling API endpoint:', apiUrl);
-        console.log('[SHARED] Request headers will include Accept: application/json');
+        console.log('[SHARED] Calling shared chat API route');
 
-        const response = await apiFetch(`/chat/shared/${shareToken}`, {
-          method: 'GET'
+        const response = await fetch(`/api/shared-chat/${shareToken}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
         });
 
         console.log('[SHARED] API response status:', response.status);
