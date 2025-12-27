@@ -1,23 +1,42 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Snowfall from 'react-snowfall';
 import { apiFetch } from '@/lib/api';
 import { checkSession } from '@/lib/session-utils';
+import UserOnboardingModal from '@/components/UserOnboardingModal';
 
 
 export default function LoginPage() {
   const router = useRouter();
   const checkedRef = useRef(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
     // ✅ Strict-mode safe: prevent double execution
     if (checkedRef.current) return;
     checkedRef.current = true;
 
-    initializeLoginPage();
+    // Pass callback to handle onboarding
+    initializeLoginPage((email: string, name: string) => {
+      setUserEmail(email);
+      setUserName(name);
+      setShowOnboarding(true);
+    });
   }, [router]);
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    // Redirect to intended page after onboarding
+    const redirectUrl = sessionStorage.getItem('oauth_redirect') || 
+                       localStorage.getItem('oauth_redirect_backup') || 
+                       '/';
+    window.location.href = redirectUrl;
+  };
 
   return (
     <>
@@ -25,6 +44,13 @@ export default function LoginPage() {
   snowflakeCount={150}
   color="#CAE7FF"
 />
+      {showOnboarding && (
+        <UserOnboardingModal
+          userEmail={userEmail}
+          userName={userName}
+          onComplete={handleOnboardingComplete}
+        />
+      )}
       <header>
         <Image src="/images/CloudFuze Horizontal Logo.svg" alt="CloudFuze Logo" width={150} height={40} priority />
       </header>
@@ -45,7 +71,7 @@ export default function LoginPage() {
   );
 }
 
-function initializeLoginPage() {
+function initializeLoginPage(onShowOnboarding?: (email: string, name: string) => void) {
   // Microsoft OAuth configuration
   let MICROSOFT_CLIENT_ID: string | null = null;
   let MICROSOFT_TENANT = "cloudfuze.com";
@@ -372,6 +398,36 @@ function initializeLoginPage() {
         sessionStorage.removeItem('manual_logout');
         console.log('[AUTH] ✅ Session created - session_id cookie set by backend');
         console.log('[AUTH] User info stored:', { id: user.id, email: user.email });
+        
+        // ✅ Check if user needs onboarding
+        try {
+          const profileResponse = await apiFetch('/user/profile', {
+            method: 'GET'
+          });
+          
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            console.log('[AUTH] User profile:', profileData);
+            
+            if (profileData.needs_onboarding && onShowOnboarding) {
+              // Hide loading indicator before showing onboarding modal
+              hideLoadingIndicator();
+              const loginContainer = document.querySelector('.login-container') as HTMLElement;
+              if (loginContainer) {
+                loginContainer.style.display = 'none';
+              }
+              
+              // Show onboarding modal
+              console.log('[AUTH] User needs onboarding, showing modal');
+              onShowOnboarding(user.email, user.name);
+              // Don't redirect yet - wait for onboarding completion
+              return;
+            }
+          }
+        } catch (profileError) {
+          console.error('[AUTH] Error checking user profile:', profileError);
+          // Continue with normal redirect if profile check fails
+        }
         
         // Get redirect URL from sessionStorage (saved before OAuth)
         // Use backup from localStorage if sessionStorage is empty

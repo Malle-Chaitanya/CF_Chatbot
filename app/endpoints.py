@@ -11,7 +11,7 @@ import base64
 import asyncio
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -23,11 +23,14 @@ from app.mongodb_memory import (
     mongodb_memory,
     add_to_conversation, get_conversation_context, get_user_chat_history, 
     clear_user_chat_history, save_session, get_all_sessions, get_user_sessions, 
-    get_session_by_id, create_shared_chat, get_shared_chat
+    get_session_by_id, create_shared_chat, get_shared_chat,
+    update_user_profile, get_user_profile, get_user_statistics, get_rankers_by_date
 )
 from app.helpers import strip_markdown, preserve_markdown
 from app.langfuse_integration import langfuse_tracker
 from app.auth import verify_user_access, require_admin, require_restricted_admin
+from app.user_data import get_user_job_title
+from app.models.teams import TEAMS_STRUCTURE, get_team_by_name
 from config import (
     SYSTEM_PROMPT, MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT,
     ENABLE_INTENT_CLASSIFICATION, ENABLE_QUERY_EXPANSION, ENABLE_CONTEXT_COMPRESSION,
@@ -529,6 +532,23 @@ async def require_auth(
             session = await session_store.get_session(session_id)
             
             if session:
+                # ✅ STRICT IDENTITY: Validate session has required fields
+                user_email = session.get("user_email", "")
+                user_id = session.get("user_id", "")
+                user_name = session.get("user_name", "")
+                
+                if not user_email or not user_email.strip():
+                    logger.error(f"[AUTH] Session {session_id[:8]}... has invalid email, rejecting")
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Invalid session: missing user email"
+                    )
+                
+                # ✅ IDENTITY RULE: Ensure user_id is email (migrate old sessions)
+                if user_id != user_email.lower().strip():
+                    logger.warning(f"[AUTH] Session user_id mismatch: {user_id} != {user_email}, using email")
+                    user_id = user_email.lower().strip()
+                
                 # Check if token needs refresh (non-blocking check)
                 token_expires_at = session.get("token_expires_at")
                 if token_expires_at and isinstance(token_expires_at, datetime):
@@ -540,11 +560,11 @@ async def require_auth(
                         # Token expiring soon - log for background refresh
                         logger.info(f"[AUTH] Token expiring soon for session {session_id[:8]}... (will refresh on next request)")
                 
-                logger.debug(f"[AUTH] User authenticated via session: {session['user_email']}")
+                logger.debug(f"[AUTH] User authenticated via session: {user_email}")
                 return {
-                    "user_id": session["user_id"],
-                    "email": session["user_email"],
-                    "name": session["user_name"]
+                    "user_id": user_id,  # ✅ Always email
+                    "email": user_email,
+                    "name": user_name if user_name else user_email.split("@")[0]
                 }
         except Exception as e:
             logger.warning(f"[AUTH] Session validation failed: {e}, falling back to token auth")
@@ -581,17 +601,31 @@ async def require_auth(
                             user_info = graph_response.json()
                             user_email = user_info.get("mail") or user_info.get("userPrincipalName", "")
                             
+                            # ✅ STRICT IDENTITY: Email is mandatory
+                            if not user_email or not user_email.strip():
+                                logger.error("[AUTH] Token auth failed: No email in Graph response")
+                                raise HTTPException(
+                                    status_code=401,
+                                    detail="Authentication failed: email missing"
+                                )
+                            
                             if not user_email.endswith("@cloudfuze.com"):
                                 raise HTTPException(
                                     status_code=403,
                                     detail="Forbidden: Only CloudFuze company accounts are allowed."
                                 )
                             
+                            # ✅ IDENTITY RULE: Use email as user_id
+                            user_id = user_email.lower().strip()
+                            user_name = user_info.get("displayName", "")
+                            if not user_name or not user_name.strip():
+                                user_name = user_email.split("@")[0].replace(".", " ").title()
+                            
                             logger.info(f"[AUTH] User authenticated via token (legacy): {user_email}")
                             return {
-                                "user_id": user_info.get("id"),
+                                "user_id": user_id,  # ✅ Always email
                                 "email": user_email,
-                                "name": user_info.get("displayName", "User")
+                                "name": user_name
                             }
                         
                         if graph_response.status_code == 401:
@@ -621,16 +655,33 @@ async def require_auth(
             
             if claims:
                 user_email = claims.get("email") or claims.get("upn") or claims.get("unique_name")
-                user_name = claims.get("name") or claims.get("given_name") or "User"
-                user_id = claims.get("oid") or claims.get("sub")
                 
-                if user_email and user_email.endswith("@cloudfuze.com"):
-                    logger.warning(f"[AUTH] ⚠️ DEV FALLBACK: User authenticated via unsafe JWT: {user_email}")
-                    return {
-                        "user_id": user_id or user_email,
-                        "email": user_email,
-                        "name": user_name
-                    }
+                # ✅ STRICT IDENTITY: Email is mandatory - fail if missing
+                if not user_email or not user_email.strip():
+                    logger.error("[AUTH] Unsafe JWT fallback failed: No email in claims")
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Authentication failed: email missing"
+                    )
+                
+                if not user_email.endswith("@cloudfuze.com"):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Forbidden: Only CloudFuze company accounts are allowed."
+                    )
+                
+                # ✅ IDENTITY RULE: Use email as user_id (never oid/sub)
+                user_id = user_email.lower().strip()
+                user_name = claims.get("name") or claims.get("given_name", "")
+                if not user_name or not user_name.strip():
+                    user_name = user_email.split("@")[0].replace(".", " ").title()
+                
+                logger.warning(f"[AUTH] ⚠️ DEV FALLBACK: User authenticated via unsafe JWT: {user_email}")
+                return {
+                    "user_id": user_id,  # ✅ Always email
+                    "email": user_email,
+                    "name": user_name
+                }
     
     # If all fails, raise 401
     raise HTTPException(
@@ -1295,8 +1346,16 @@ async def chat_stream(request: Request, auth_user: dict = Depends(require_auth))
     user_name = auth_user["name"]
     user_email = auth_user["email"]
 
-    # Use user_id if provided, otherwise fall back to session_id for backward compatibility
-    conversation_id = user_id if user_id else session_id
+    # ✅ STRICT IDENTITY: user_id is mandatory - fail fast if missing
+    if not user_id or not user_id.strip():
+        logger.error(f"[AUTH] ⚠️ Invalid user_id in auth_user: {auth_user}")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid user identity. Please log in again."
+        )
+    
+    # ✅ IDENTITY RULE: conversation_id = user_id (always email, never session_id)
+    conversation_id = user_id
 
     async def generate_stream():
         try:
@@ -2381,6 +2440,147 @@ async def get_user_chat_messages(
     except Exception as e:
         return {"error": str(e)}
 
+# ---------------- User Profile Endpoints ----------------
+
+@router.get("/user/profile")
+async def get_user_profile_endpoint(
+    auth_user: dict = Depends(require_auth)
+):
+    """Get current user's profile including team, manager, and role."""
+    try:
+        user_id = auth_user.get("user_id") or auth_user.get("email")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="User ID not found in auth")
+        
+        profile = await get_user_profile(user_id)
+        
+        if not profile:
+            # User doesn't have profile yet - return empty structure
+            return {
+                "user_id": user_id,
+                "user_email": auth_user.get("email", ""),
+                "user_name": auth_user.get("name", ""),
+                "team_name": None,
+                "manager_email": None,
+                "manager_name": None,
+                "role": None,
+                "needs_onboarding": True
+            }
+        
+        # Check if onboarding is needed
+        needs_onboarding = not profile.get("team_name") or not profile.get("role")
+        
+        return {
+            "user_id": profile.get("user_id", user_id),
+            "user_email": profile.get("user_email", auth_user.get("email", "")),
+            "user_name": profile.get("user_name", auth_user.get("name", "")),
+            "team_name": profile.get("team_name"),
+            "manager_email": profile.get("manager_email"),
+            "manager_name": profile.get("manager_name"),
+            "role": profile.get("role"),
+            "needs_onboarding": needs_onboarding
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user profile: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting user profile: {str(e)}")
+
+
+class UserProfileUpdate(BaseModel):
+    team_name: str
+    role: Optional[str] = None
+
+
+@router.post("/user/profile")
+async def update_user_profile_endpoint(
+    profile_data: UserProfileUpdate,
+    auth_user: dict = Depends(require_auth)
+):
+    """Update user profile with team, manager, and role."""
+    try:
+        user_id = auth_user.get("user_id") or auth_user.get("email")
+        user_email = auth_user.get("email", "")
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="User ID not found in auth")
+        
+        # Validate team exists
+        team_info = get_team_by_name(profile_data.team_name)
+        if not team_info:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Team '{profile_data.team_name}' not found"
+            )
+        
+        # Get manager info from team lead (optional - team may not have a lead)
+        manager_email = team_info.get("lead_email", "") or ""
+        manager_name = team_info.get("lead", "") or ""
+        
+        # Manager is optional - empty strings are acceptable
+        
+        # Get role from users.json if not provided
+        role = profile_data.role
+        if not role:
+            role = get_user_job_title(user_email) or ""
+        
+        # Update user profile
+        success = await update_user_profile(
+            user_id=user_id,
+            team_name=profile_data.team_name,
+            manager_email=manager_email,
+            manager_name=manager_name,
+            role=role
+        )
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update user profile")
+        
+        return {
+            "success": True,
+            "message": "Profile updated successfully",
+            "profile": {
+                "team_name": profile_data.team_name,
+                "manager_email": manager_email,
+                "manager_name": manager_name,
+                "role": role
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating user profile: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating user profile: {str(e)}")
+
+
+@router.get("/teams/list")
+async def get_teams_list(
+    auth_user: dict = Depends(require_auth)
+):
+    """Get list of all teams for onboarding dropdown."""
+    try:
+        teams_list = []
+        
+        for team_name, team_info in TEAMS_STRUCTURE.items():
+            teams_list.append({
+                "team_name": team_name,
+                "lead_name": team_info.get("lead", ""),
+                "lead_email": team_info.get("lead_email", ""),
+                "color": team_info.get("color", "#6B7280"),
+                "description": team_info.get("description", "")
+            })
+        
+        return {
+            "teams": teams_list,
+            "total": len(teams_list)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting teams list: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting teams list: {str(e)}")
+
 # ---------------- Share Chat Endpoints ----------------
 
 @router.post("/chat/share/{session_id}")
@@ -3005,6 +3205,361 @@ async def get_most_asked_questions(
     }
 
 
+# ---------------- Admin Dashboard: User Statistics ----------------
+
+
+@router.get("/admin/users/summary")
+async def get_admin_users_summary(
+    exclude_users: Optional[str] = Query(None, description="Comma-separated list of user emails/names to exclude"),
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Get ALL-TIME user statistics from user_activity collection.
+    Returns pre-calculated lifetime metrics (no date filtering).
+    
+    This endpoint is used by the admin dashboard for the "All Time" view.
+    """
+    try:
+        # Parse exclude_users if provided
+        exclude_list = None
+        if exclude_users:
+            exclude_list = [u.strip() for u in exclude_users.split(",") if u.strip()]
+        
+        # Get statistics from MongoDB
+        users = await get_user_statistics(exclude_users=exclude_list)
+        
+        return {
+            "total_users": len(users),
+            "users": users,
+            "generated_at": datetime.utcnow().isoformat(),
+            "data_source": "user_activity",
+            "time_range": "all_time",
+            "filters_applied": {
+                "excluded_users_count": len(exclude_list) if exclude_list else 0
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting admin users summary: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve user statistics: {str(e)}"
+        )
+
+
+@router.get("/admin/rankers")
+async def get_admin_rankers(
+    from_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
+    to_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
+    exclude_users: Optional[str] = Query(None, description="Comma-separated list of user emails/names to exclude"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of rankers to return"),
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Get date-based user rankers from message_events collection.
+    Returns time-filtered analytics for specific date ranges.
+    
+    This endpoint is used by the admin dashboard for date-filtered views.
+    """
+    try:
+        # Parse dates if provided
+        start_date = None
+        end_date = None
+        if from_date:
+            try:
+                start_date = datetime.strptime(from_date, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid from_date format. Use YYYY-MM-DD")
+        
+        if to_date:
+            try:
+                # Set to end of day for inclusive end date
+                end_date = datetime.strptime(to_date, "%Y-%m-%d")
+                end_date = end_date.replace(hour=23, minute=59, second=59)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid to_date format. Use YYYY-MM-DD")
+        
+        # Parse exclude_users if provided
+        exclude_list = None
+        if exclude_users:
+            exclude_list = [u.strip() for u in exclude_users.split(",") if u.strip()]
+        
+        # Get rankers from MongoDB
+        rankers = await get_rankers_by_date(
+            start_date=start_date,
+            end_date=end_date,
+            exclude_users=exclude_list,
+            limit=limit
+        )
+        
+        return {
+            "total_rankers": len(rankers),
+            "rankers": rankers,
+            "generated_at": datetime.utcnow().isoformat(),
+            "data_source": "message_events",
+            "filters_applied": {
+                "from_date": from_date,
+                "to_date": to_date,
+                "excluded_users_count": len(exclude_list) if exclude_list else 0
+            },
+            "time_range": f"{from_date or 'all'} to {to_date or 'all'}" if from_date or to_date else "all"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting admin rankers: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve rankers: {str(e)}"
+        )
+
+
+# ---------------- Admin Teams Dashboard: MongoDB-based Team Analytics ----------------
+
+
+@router.get("/admin/teams/summary")
+async def get_teams_summary_mongodb(
+    from_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
+    to_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
+    exclude_users: Optional[str] = Query(None, description="Comma-separated list of user emails/names to exclude"),
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Get team-wise statistics from MongoDB.
+    - If dates provided: Uses message_events collection (date-filtered)
+    - If no dates: Uses user_activity collection (all-time aggregated)
+    
+    This endpoint is used by the admin teams dashboard.
+    """
+    try:
+        await mongodb_memory.connect()
+        
+        # Parse dates if provided
+        start_date = None
+        end_date = None
+        if from_date:
+            try:
+                start_date = datetime.strptime(from_date, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid from_date format. Use YYYY-MM-DD")
+        
+        if to_date:
+            try:
+                end_date = datetime.strptime(to_date, "%Y-%m-%d")
+                end_date = end_date.replace(hour=23, minute=59, second=59)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid to_date format. Use YYYY-MM-DD")
+        
+        # Parse exclude_users if provided
+        exclude_list = None
+        if exclude_users:
+            exclude_list = [u.strip().lower() for u in exclude_users.split(",") if u.strip()]
+        
+        # Determine data source based on date filter
+        if start_date or end_date:
+            # Date-based: Query message_events collection
+            logger.info(f"[TEAMS] Date-based query: {start_date} to {end_date}")
+            message_events_collection = mongodb_memory.database["message_events"]
+            user_activity_collection = mongodb_memory.database["user_activity"]
+            
+            # Build date filter
+            date_filter = {}
+            if start_date or end_date:
+                date_range = {}
+                if start_date:
+                    if start_date.tzinfo is None:
+                        start_date = start_date.replace(tzinfo=timezone.utc)
+                    date_range["$gte"] = start_date
+                if end_date:
+                    if end_date.tzinfo is None:
+                        end_date = end_date.replace(tzinfo=timezone.utc)
+                    date_range["$lte"] = end_date
+                if date_range:
+                    date_filter["created_at"] = date_range
+            
+            # Build exclusion filter
+            exclude_filter = {}
+            if exclude_list:
+                exclude_emails_lower = [email.lower() for email in exclude_list]
+                exclude_filter["user_email"] = {"$nin": exclude_emails_lower}
+            
+            # Aggregate messages by user_email from message_events
+            match_filter = {"event_type": "message", **date_filter, **exclude_filter}
+            
+            pipeline = [
+                {"$match": match_filter},
+                {"$group": {
+                    "_id": "$user_id",
+                    "user_email": {"$first": "$user_email"},
+                    "user_name": {"$first": "$user_name"},
+                    "total_messages": {"$sum": 1}
+                }},
+                {"$project": {
+                    "_id": 0,
+                    "user_id": "$_id",
+                    "user_email": 1,
+                    "user_name": 1,
+                    "total_messages": 1
+                }}
+            ]
+            
+            user_messages = await message_events_collection.aggregate(pipeline).to_list(length=None)
+            logger.info(f"[TEAMS] Found {len(user_messages)} users with messages in date range")
+            
+            # Get team assignments from user_activity
+            teams_data = {}
+            for user_msg in user_messages:
+                user_email = user_msg.get("user_email", "").lower()
+                user_name = user_msg.get("user_name", "")
+                total_messages = user_msg.get("total_messages", 0)
+                
+                # Get team_name from user_activity
+                user_doc = await user_activity_collection.find_one(
+                    {"user_id": user_email},
+                    {"team_name": 1}
+                )
+                
+                team_name = None
+                if user_doc:
+                    team_name = user_doc.get("team_name")
+                
+                # Skip users without team assignment
+                if not team_name or team_name.strip() == "":
+                    continue
+                
+                # Initialize team if not exists
+                if team_name not in teams_data:
+                    teams_data[team_name] = {
+                        "team_name": team_name,
+                        "total_messages": 0,
+                        "active_members": set(),
+                        "member_details": []
+                    }
+                
+                # Aggregate team data
+                teams_data[team_name]["total_messages"] += total_messages
+                teams_data[team_name]["active_members"].add(user_email)
+                teams_data[team_name]["member_details"].append({
+                    "email": user_email,
+                    "name": user_name,
+                    "messages": total_messages
+                })
+            
+            data_source = "message_events"
+            time_range = f"{from_date or 'all'} to {to_date or 'all'}" if from_date or to_date else "all"
+        else:
+            # All-time: Use user_activity collection
+            logger.info(f"[TEAMS] All-time query from user_activity")
+            user_activity_collection = mongodb_memory.database["user_activity"]
+            
+            # Get all user_activity documents
+            cursor = user_activity_collection.find({})
+            all_users = await cursor.to_list(length=None)
+            
+            logger.info(f"[TEAMS] Found {len(all_users)} users in user_activity collection")
+            
+            # Group users by team_name
+            teams_data = {}
+            
+            for user_doc in all_users:
+                user_email = user_doc.get("user_email", "").lower()
+                user_name = user_doc.get("user_name", "")
+                team_name = user_doc.get("team_name")
+                total_messages = user_doc.get("total_messages", 0)
+                
+                # Skip excluded users
+                if exclude_list:
+                    if user_email in exclude_list or user_name.lower() in exclude_list:
+                        continue
+                    # Also check if any excluded email/name is contained
+                    if any(excluded in user_email or excluded in user_name.lower() for excluded in exclude_list):
+                        continue
+                
+                # Skip users without team assignment
+                if not team_name or team_name.strip() == "":
+                    continue
+                
+                # Initialize team if not exists
+                if team_name not in teams_data:
+                    teams_data[team_name] = {
+                        "team_name": team_name,
+                        "total_messages": 0,
+                        "active_members": set(),
+                        "member_details": []
+                    }
+                
+                # Aggregate team data
+                teams_data[team_name]["total_messages"] += total_messages
+                teams_data[team_name]["active_members"].add(user_email)
+                teams_data[team_name]["member_details"].append({
+                    "email": user_email,
+                    "name": user_name,
+                    "messages": total_messages
+                })
+            
+            data_source = "user_activity"
+            time_range = "all_time"
+        
+        # Convert to list format and get team info from teams.py
+        from app.models.teams import get_team_by_name, get_all_teams, get_team_color
+        
+        teams_list = []
+        for team_name, team_data in teams_data.items():
+            # Get team info from teams.py
+            team_info = get_team_by_name(team_name)
+            if not team_info:
+                # Team not found in teams.py, use defaults
+                team_info = {
+                    "lead": None,
+                    "lead_email": None,
+                    "members": [],
+                    "color": "#6B7280",  # Gray fallback
+                    "description": team_name
+                }
+            
+            teams_list.append({
+                "team_name": team_name,
+                "lead": team_info.get("lead"),
+                "lead_email": team_info.get("lead_email"),
+                "color": get_team_color(team_name) or team_info.get("color", "#6B7280"),
+                "description": team_info.get("description", team_name),
+                "total_messages": team_data["total_messages"],
+                "total_questions": team_data["total_messages"],  # Map messages to questions for frontend compatibility
+                "unique_questions": 0,  # Not available from user_activity, set to 0
+                "top_questions": [],  # Not available from user_activity, empty array
+                "active_members_count": len(team_data["active_members"]),
+                "member_count": len(team_info.get("members", [])),
+                "members": team_data["member_details"]
+            })
+        
+        # Sort by total_messages descending
+        teams_list.sort(key=lambda x: x["total_messages"], reverse=True)
+        
+        logger.info(f"[TEAMS] Returning {len(teams_list)} teams with data")
+        
+        return {
+            "status": "success",
+            "total_teams": len(teams_list),
+            "teams": teams_list,
+            "generated_at": datetime.utcnow().isoformat(),
+            "data_source": data_source,
+            "time_range": time_range,
+            "filters_applied": {
+                "from_date": from_date,
+                "to_date": to_date,
+                "excluded_users_count": len(exclude_list) if exclude_list else 0
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting teams summary from MongoDB: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve team statistics: {str(e)}"
+        )
+
+
 @router.get("/dataset/corrected-responses")
 async def get_corrected_responses(current_user: dict = Depends(require_admin)):
     """Get all corrected responses from the dataset. Requires admin access."""
@@ -3064,7 +3619,7 @@ async def get_teams_analytics_summary(
         from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
         from app.models.teams import get_all_teams, get_team_by_member_email, get_team_color
         import asyncio
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timezone, timedelta, timezone
         
         logger.info("[LANGFUSE ANALYTICS] ===== Teams Summary Request Started =====")
         logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/teams/summary")
@@ -3208,7 +3763,27 @@ async def get_teams_analytics_summary(
                             normalized_email = user_email_str.lower().strip()
                             if not normalized_email:
                                 continue
-                            team_name = get_team_by_member_email(normalized_email)
+                            
+                            # ✅ PRIORITY: Check user_activity.team_name first, then fallback to email matching
+                            team_name = None
+                            try:
+                                # Try to get team from user_activity (onboarded users)
+                                user_profile = await get_user_profile(normalized_email)
+                                if user_profile and user_profile.get("team_name"):
+                                    team_name = user_profile.get("team_name")
+                                    logger.debug(f"[ANALYTICS] User {normalized_email} assigned to team via profile: {team_name}")
+                            except Exception as e:
+                                logger.debug(f"[ANALYTICS] Could not get user profile for {normalized_email}: {e}")
+                            
+                            # Fallback to email matching if no profile team found
+                            if not team_name:
+                                team_name = get_team_by_member_email(normalized_email)
+                                if team_name and team_name != "Unassigned":
+                                    logger.debug(f"[ANALYTICS] User {normalized_email} assigned to team via email matching: {team_name}")
+                            
+                            # If still no team, assign to "Unassigned"
+                            if not team_name:
+                                team_name = "Unassigned"
                                 
                             if team_name in teams_data:
                                 teams_data[team_name]["active_members"].add(normalized_email)
@@ -3306,7 +3881,7 @@ async def get_team_details(
         from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
         from app.models.teams import get_team_by_name, get_all_team_members_emails
         import asyncio
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timezone, timedelta, timezone
         
         logger.info("[LANGFUSE ANALYTICS] ===== Team Details Request Started =====")
         logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/teams/details")
@@ -3567,7 +4142,7 @@ async def get_langfuse_dashboard_summary(
     try:
         from app.langfuse_integration import langfuse_client
         import asyncio
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timezone, timedelta, timezone
         
         logger.info("[LANGFUSE ANALYTICS] ===== Dashboard Summary Request Started =====")
         logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/dashboard-summary")
@@ -3800,7 +4375,7 @@ async def get_langfuse_users_analytics(
         from app.langfuse_integration import langfuse_client
         from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
         import asyncio
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timezone, timedelta, timezone
         
         logger.info("[LANGFUSE ANALYTICS] ===== Users Analytics Request Started =====")
         logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/users")
@@ -4056,7 +4631,7 @@ async def get_user_langfuse_analytics(
         from app.langfuse_integration import langfuse_client
         from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
         import asyncio
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timezone, timedelta, timezone
         
         logger.info("[LANGFUSE ANALYTICS] ===== User Analytics Request Started =====")
         logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/users/{user_id}")
@@ -4272,7 +4847,7 @@ async def get_top_questions_global(
         from app.langfuse_integration import langfuse_client
         from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
         import asyncio
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timezone, timedelta, timezone
         
         logger.info("[LANGFUSE ANALYTICS] ===== Top Questions Request Started =====")
         logger.info(f"[LANGFUSE ANALYTICS] Endpoint: /analytics/langfuse/top-questions")
@@ -4730,7 +5305,7 @@ async def save_correction_to_dataset(user_query: str, bad_response: str, improve
     """Save the correction to JSONL dataset."""
     try:
         import os
-        from datetime import datetime
+        from datetime import datetime, timezone
         
         # Create dataset directory if it doesn't exist
         dataset_dir = "./data/fine_tuning_dataset"
@@ -5093,18 +5668,34 @@ async def microsoft_oauth_callback(
             
             user_info = graph_response.json()
             
-            # Create user ID from Microsoft user ID
-            user_id = user_info.get("id")
-            user_name = user_info.get("displayName", "User")
+            # ✅ STRICT IDENTITY: Email is mandatory - fail fast if missing
             user_email = user_info.get("mail") or user_info.get("userPrincipalName", "")
+            if not user_email or not user_email.strip():
+                logger.error("[AUTH] OAuth callback failed: No email in Microsoft Graph response")
+                return {
+                    "error": "Authentication failed",
+                    "message": "Unable to retrieve user email. Please try logging in again.",
+                    "details": "Email missing from Microsoft Graph API response"
+                }
             
-            # Validate that the user has a CloudFuze email domain
+            # ✅ Validate that the user has a CloudFuze email domain
             if not user_email.endswith("@cloudfuze.com"):
                 return {
                     "error": "Access denied", 
                     "message": "Only CloudFuze company accounts are allowed to access this application.",
                     "details": f"Email domain not allowed: {user_email}"
                 }
+            
+            # ✅ IDENTITY RULE: Use email as user_id (stable, consistent, human-readable)
+            # This ensures chat history is always stored under the same key
+            user_id = user_email.lower().strip()
+            
+            # ✅ Get name - fail if missing (no default "User")
+            user_name = user_info.get("displayName", "")
+            if not user_name or not user_name.strip():
+                # Extract name from email as last resort
+                user_name = user_email.split("@")[0].replace(".", " ").title()
+                logger.warning(f"[AUTH] No displayName from Graph API, using email prefix: {user_name}")
             
             # ✅ NEW: Create backend session (Graph API called ONLY here)
             from app.session_store import session_store
@@ -5200,255 +5791,32 @@ async def microsoft_oauth_callback(
         logger.error(f"[AUTH] ❌ OAuth callback exception: {str(e)}", exc_info=True)
         return {"error": f"OAuth callback failed: {str(e)}"}
 # ============================================================================
-# TEAM-WISE ANALYTICS ENDPOINTS
+# TEAM-WISE ANALYTICS ENDPOINTS (DUPLICATE - REMOVED)
+# The endpoint at line 3482 is the active one
 # ============================================================================
 
-@router.get("/analytics/langfuse/teams/summary")
-async def get_langfuse_teams_summary(
-    start_date: str = Query(None, description="Start date in YYYY-MM-DD format"),
-    end_date: str = Query(None, description="End date in YYYY-MM-DD format"),
-    time_filter: str = Query(None, description="(Legacy) Filter by time: today, yesterday, this_week, last_week, all"),
-    current_user: dict = Depends(require_restricted_admin)
-):
-    """
-    Get team-wise analytics summary from Langfuse traces.
-    Returns aggregated statistics for all 8 teams.
-    Supports both date range (start_date/end_date) and preset filters (time_filter).
-    """
-    try:
-        print(f"[TEAMS] Starting teams summary fetch: start_date={start_date}, end_date={end_date}, time_filter={time_filter}")
-        from app.langfuse_integration import langfuse_client
-        from app.models.teams import TEAMS, get_team_for_member, MEMBER_TO_TEAM
-        from datetime import timedelta
-        
-        if not langfuse_client:
-            return {"error": "Langfuse client not initialized", "status": "error"}
-        
-        # Calculate time range based on start_date/end_date or legacy time_filter
-        start_time = None
-        end_time = datetime.utcnow()
-        max_pages = 30
-        request_timeout = 60.0
-        
-        # Use custom date range if provided
-        if start_date and end_date:
-            try:
-                start_time = datetime.strptime(start_date, "%Y-%m-%d").replace(hour=0, minute=0, second=0, microsecond=0)
-                end_time = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, microsecond=999999)
-                
-                # Adjust page limits based on date range width
-                date_diff = (end_time - start_time).days
-                if date_diff <= 1:
-                    max_pages = 10
-                    request_timeout = 30.0
-                elif date_diff <= 7:
-                    max_pages = 15
-                    request_timeout = 45.0
-                elif date_diff <= 30:
-                    max_pages = 20
-                    request_timeout = 60.0
-            except ValueError:
-                return {"error": "Invalid date format. Use YYYY-MM-DD", "status": "error"}
-        
-        # Fallback to legacy time_filter
-        elif time_filter == "today":
-            start_time = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            max_pages = 10
-            request_timeout = 30.0
-        elif time_filter == "yesterday":
-            start_time = (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - 
-                         timedelta(days=1))
-            end_time = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            max_pages = 10
-            request_timeout = 30.0
-        elif time_filter == "this_week":
-            start_time = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
-            start_time = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
-            max_pages = 15
-            request_timeout = 45.0
-        elif time_filter == "last_week":
-            utc_now = datetime.utcnow()
-            days_since_monday = utc_now.weekday()
-            last_monday = utc_now - timedelta(days=days_since_monday + 7)
-            start_time = last_monday.replace(hour=0, minute=0, second=0, microsecond=0)
-            max_pages = 20
-            request_timeout = 45.0
-        elif time_filter == "last_7_days":
-            start_time = datetime.utcnow() - timedelta(days=7)
-            max_pages = 20
-            request_timeout = 45.0
-        
-        # Initialize team data structure
-        team_stats = {}
-        for team_name in TEAMS.keys():
-            try:
-                team_info = TEAMS[team_name]
-                lead = team_info.get("Lead")
-                members = team_info.get("Members", [])
-                member_count = len([m for m in members if m]) if members else 0
-                
-                team_stats[team_name] = {
-                    "team_name": team_name,
-                    "lead": lead,
-                    "lead_email": "",
-                    "member_count": member_count,
-                    "active_members_count": 0,
-                    "color": get_team_color(team_name),
-                    "total_questions": 0,
-                    "unique_questions": 0,
-                    "top_questions": [],
-                    "questions_list": [],
-                    "active_members": set()
-                }
-            except Exception as e:
-                print(f"[WARN] Error initializing team {team_name}: {e}")
-                continue
-        
-        # Fetch traces from Langfuse
-        page = 1
-        batch_limit = 100
-        
-        async with httpx.AsyncClient() as client:
-            from config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
-            
-            while page <= max_pages:
-                try:
-                    params = {
-                        "page": page,
-                        "limit": batch_limit,
-                        "orderBy[createdAt]": "DESC"
-                    }
-                    if start_time:
-                        params["createdAt[gte]"] = start_time.isoformat() + "Z"
-                    if end_time:
-                        params["createdAt[lte]"] = end_time.isoformat() + "Z"
-                    
-                    response = await client.get(
-                        f"{LANGFUSE_HOST}/api/public/traces",
-                        params=params,
-                        auth=(LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY),
-                        timeout=request_timeout
-                    )
-                    
-                    if response.status_code == 429:
-                        print(f"[WARNING] Langfuse rate limited at page {page}")
-                        break
-                    
-                    response.raise_for_status()
-                    
-                    traces_response = response.json()
-                    traces = traces_response.get("data", [])
-                    
-                    if not traces:
-                        break
-                    
-                    for trace in traces:
-                        try:
-                            user_id = trace.get("userId", "")
-                            metadata = trace.get("metadata", {})
-                            question = trace.get("input", "")
-                            
-                            # Extract user info safely
-                            user_email = trace.get("metadata", {}).get("user_email")
-                            user_name = trace.get("metadata", {}).get("user_name", "Unknown")
-                            
-                            # Convert to strings safely
-                            user_email = str(user_email) if user_email else ""
-                            user_name = str(user_name) if user_name else "Unknown"
-                            
-                            # Find team for this user
-                            team_name = None
-                            
-                            # Try to match by email against all team member emails
-                            if user_email and user_email != "":
-                                try:
-                                    email_lower = user_email.lower()
-                                    # Direct lookup using the get_team_by_member_email function
-                                    from app.models.teams import get_team_by_member_email
-                                    found_team = get_team_by_member_email(email_lower)
-                                    if found_team and found_team != "Unassigned":
-                                        team_name = found_team
-                                except Exception as match_err:
-                                    print(f"[WARN] Error matching email {user_email}: {match_err}")
-                            
-                            # Assign to Unknown team if not found (optional)
-                            if not team_name or team_name == "Unknown" or team_name == "Unassigned":
-                                continue
-                            
-                            # Update team stats
-                            if team_name in team_stats and question:
-                                team_stats[team_name]["total_questions"] += 1
-                                team_stats[team_name]["questions_list"].append(question)
-                                team_stats[team_name]["active_members"].add(user_email or user_name)
-                                
-                                # Update lead email if this is the lead
-                                lead = TEAMS[team_name].get("Lead")
-                                if user_email and lead and lead == user_name:
-                                    team_stats[team_name]["lead_email"] = user_email
-                        except Exception as trace_err:
-                            print(f"[WARN] Error processing trace: {trace_err}")
-                            continue
-                    
-                    if len(traces) < batch_limit:
-                        break
-                    
-                    page += 1
-                    await asyncio.sleep(0.5)
-                    
-                except httpx.RequestError as e:
-                    print(f"[ERROR] Network error during Langfuse API call: {e}")
-                    break
-                except httpx.HTTPStatusError as e:
-                    print(f"[ERROR] Langfuse API returned HTTP error {e.response.status_code}")
-                    break
-                except Exception as e:
-                    print(f"[ERROR] Langfuse API error: {e}")
-                    break
-        
-        # Process questions and calculate unique counts
-        teams_list = []
-        for team_name, stats in team_stats.items():
-            stats["active_members_count"] = len(stats["active_members"])
-            
-            # Calculate unique questions
-            if stats["questions_list"]:
-                unique_questions = set(stats["questions_list"])
-                stats["unique_questions"] = len(unique_questions)
-                
-                # Get top 5 questions
-                question_counts = Counter(stats["questions_list"])
-                top_questions = question_counts.most_common(5)
-                stats["top_questions"] = [
-                    {"question": q, "count": c} for q, c in top_questions
-                ]
-            
-            # Remove temporary fields
-            del stats["questions_list"]
-            del stats["active_members"]
-            
-            teams_list.append(stats)
-        
-        # Sort by total questions descending
-        teams_list.sort(key=lambda x: x["total_questions"], reverse=True)
-        
-        total_questions = sum(t["total_questions"] for t in teams_list)
-        active_teams = sum(1 for t in teams_list if t["total_questions"] > 0)
-        
-        return {
-            "status": "success",
-            "time_filter": time_filter,
-            "teams": teams_list,
-            "total_teams": len(TEAMS),
-            "total_questions": total_questions,
-            "total_active_teams": active_teams
-        }
-        
-    except Exception as e:
-        print(f"[ERROR] Team analytics fetch failed: {e}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
+# DUPLICATE ENDPOINT - FULLY COMMENTED OUT (using the one at line 3482 instead)
+# @router.get("/analytics/langfuse/teams/summary")
+# async def get_langfuse_teams_summary(
+#     start_date: str = Query(None, description="Start date in YYYY-MM-DD format"),
+#     end_date: str = Query(None, description="End date in YYYY-MM-DD format"),
+#     time_filter: str = Query(None, description="(Legacy) Filter by time: today, yesterday, this_week, last_week, all"),
+#     current_user: dict = Depends(require_restricted_admin)
+# ):
+#     """
+#     Get team-wise analytics summary from Langfuse traces.
+#     Returns aggregated statistics for all 8 teams.
+#     Supports both date range (start_date/end_date) and preset filters (time_filter).
+#     """
+#     try:
+#         print(f"[TEAMS] Starting teams summary fetch: start_date={start_date}, end_date={end_date}, time_filter={time_filter}")
+#         from app.langfuse_integration import langfuse_client
+#         from app.models.teams import TEAMS, get_team_for_member, MEMBER_TO_TEAM
+#         from datetime import timedelta
+#         
+#         if not langfuse_client:
+#             return {"error": "Langfuse client not initialized", "status": "error"}
+#         ... (entire duplicate function body removed - using endpoint at line 3482 instead)
 
 
 @router.get("/analytics/langfuse/teams/details")

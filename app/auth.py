@@ -82,6 +82,23 @@ async def get_current_user(
             session = await session_store.get_session(session_id)
             
             if session:
+                # ✅ STRICT IDENTITY: Validate session has required fields
+                user_email = session.get("user_email", "")
+                user_id = session.get("user_id", "")
+                user_name = session.get("user_name", "")
+                
+                if not user_email or not user_email.strip():
+                    logger.error(f"[AUTH] Session {session_id[:8]}... has invalid email, rejecting")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid session: missing user email"
+                    )
+                
+                # ✅ IDENTITY RULE: Ensure user_id is email (migrate old sessions)
+                if user_id != user_email.lower().strip():
+                    logger.warning(f"[AUTH] Session user_id mismatch: {user_id} != {user_email}, using email")
+                    user_id = user_email.lower().strip()
+                
                 # Check if token needs refresh (but don't block request)
                 token_expires_at = session.get("token_expires_at")
                 if token_expires_at and isinstance(token_expires_at, datetime):
@@ -94,11 +111,11 @@ async def get_current_user(
                         logger.info(f"[AUTH] Token expiring soon for session {session_id[:8]}..., refreshing in background")
                         # Background refresh will be handled by token refresh endpoint
                 
-                logger.debug(f"[AUTH] User authenticated via session: {session['user_email']}")
+                logger.debug(f"[AUTH] User authenticated via session: {user_email}")
                 return {
-                    "id": session["user_id"],
-                    "email": session["user_email"],
-                    "name": session["user_name"]
+                    "id": user_id,  # ✅ Always email
+                    "email": user_email,
+                    "name": user_name if user_name else user_email.split("@")[0]
                 }
         except Exception as e:
             logger.warning(f"[AUTH] Session validation failed: {e}, falling back to token auth")
@@ -152,16 +169,13 @@ async def _get_current_user_from_token(access_token: str) -> Dict[str, str]:
             
             user_info = response.json()
             
-            # Extract user information
-            user_id = user_info.get("id")
+            # ✅ STRICT IDENTITY: Email is mandatory - fail fast if missing
             user_email = user_info.get("mail") or user_info.get("userPrincipalName", "")
-            user_name = user_info.get("displayName", "User")
-            
-            if not user_id:
-                logger.error("No user ID in Microsoft Graph response")
+            if not user_email or not user_email.strip():
+                logger.error("[AUTH] Token auth failed: No email in Microsoft Graph response")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid user information",
+                    detail="Authentication failed: email missing",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             
@@ -173,10 +187,16 @@ async def _get_current_user_from_token(access_token: str) -> Dict[str, str]:
                     detail="Access denied. Only CloudFuze company accounts are allowed.",
                 )
             
+            # ✅ IDENTITY RULE: Use email as user_id (stable, consistent)
+            user_id = user_email.lower().strip()
+            user_name = user_info.get("displayName", "")
+            if not user_name or not user_name.strip():
+                user_name = user_email.split("@")[0].replace(".", " ").title()
+            
             logger.info(f"User authenticated successfully via token: {user_id} ({user_email})")
             
             return {
-                "id": user_id,
+                "id": user_id,  # ✅ Always email
                 "email": user_email,
                 "name": user_name
             }

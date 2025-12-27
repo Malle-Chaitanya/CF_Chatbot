@@ -362,19 +362,40 @@ class MongoDBMemoryManager:
                 avg_messages = total_messages / total_sessions if total_sessions > 0 else 0
                 
                 # Update user activity document
+                # Preserve existing team/manager/role fields if not provided in session_data
+                update_data = {
+                    "user_email": session_data.get("user_email", existing_activity.get("user_email", "")),
+                    "user_name": session_data.get("user_name", existing_activity.get("user_name", "")),
+                    "sessions": sessions,
+                    "total_messages": total_messages,
+                    "total_sessions": total_sessions,
+                    "avg_messages_per_session": round(avg_messages, 2),
+                    "last_active": updated_at
+                }
+                
+                # Preserve team/manager/role fields if they exist (don't overwrite with empty values)
+                if existing_activity.get("team_name"):
+                    update_data["team_name"] = existing_activity.get("team_name")
+                if existing_activity.get("manager_email"):
+                    update_data["manager_email"] = existing_activity.get("manager_email")
+                if existing_activity.get("manager_name"):
+                    update_data["manager_name"] = existing_activity.get("manager_name")
+                if existing_activity.get("role"):
+                    update_data["role"] = existing_activity.get("role")
+                
+                # Allow session_data to override if explicitly provided
+                if session_data.get("team_name"):
+                    update_data["team_name"] = session_data.get("team_name")
+                if session_data.get("manager_email"):
+                    update_data["manager_email"] = session_data.get("manager_email")
+                if session_data.get("manager_name"):
+                    update_data["manager_name"] = session_data.get("manager_name")
+                if session_data.get("role"):
+                    update_data["role"] = session_data.get("role")
+                
                 await user_activity_collection.update_one(
                     {"user_id": user_id},
-                    {
-                        "$set": {
-                            "user_email": session_data.get("user_email", existing_activity.get("user_email", "")),
-                            "user_name": session_data.get("user_name", existing_activity.get("user_name", "")),
-                            "sessions": sessions,
-                            "total_messages": total_messages,
-                            "total_sessions": total_sessions,
-                            "avg_messages_per_session": round(avg_messages, 2),
-                            "last_active": updated_at
-                        }
-                    }
+                    {"$set": update_data}
                 )
             else:
                 # New user - create activity document
@@ -385,7 +406,7 @@ class MongoDBMemoryManager:
                     "message_count": message_count
                 }]
                 
-                await user_activity_collection.insert_one({
+                new_user_doc = {
                     "user_id": user_id,
                     "user_email": session_data.get("user_email", ""),
                     "user_name": session_data.get("user_name", ""),
@@ -395,7 +416,19 @@ class MongoDBMemoryManager:
                     "avg_messages_per_session": float(message_count),
                     "last_active": updated_at,
                     "created_at": created_at
-                })
+                }
+                
+                # Add team/manager/role fields if provided
+                if session_data.get("team_name"):
+                    new_user_doc["team_name"] = session_data.get("team_name")
+                if session_data.get("manager_email"):
+                    new_user_doc["manager_email"] = session_data.get("manager_email")
+                if session_data.get("manager_name"):
+                    new_user_doc["manager_name"] = session_data.get("manager_name")
+                if session_data.get("role"):
+                    new_user_doc["role"] = session_data.get("role")
+                
+                await user_activity_collection.insert_one(new_user_doc)
             
             logger.debug(f"Updated user_activity for user {user_id}")
             
@@ -1110,6 +1143,91 @@ class MongoDBMemoryManager:
         except Exception as e:
             logger.error(f"Error migrating data: {e}")
             raise e
+    
+    async def update_user_profile(
+        self,
+        user_id: str,
+        team_name: str,
+        manager_email: str,
+        manager_name: str,
+        role: str
+    ) -> bool:
+        """
+        Update user profile with team, manager, and role information.
+        
+        Args:
+            user_id: User ID (email)
+            team_name: Team name from teams.py
+            manager_email: Team lead email
+            manager_name: Team lead name
+            role: User's role/job title
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            await self.connect()
+            user_activity_collection = self.database["user_activity"]
+            
+            # Update or create user_activity document with profile info
+            await user_activity_collection.update_one(
+                {"user_id": user_id},
+                {
+                    "$set": {
+                        "team_name": team_name,
+                        "manager_email": manager_email,
+                        "manager_name": manager_name,
+                        "role": role
+                    }
+                },
+                upsert=True
+            )
+            
+            logger.info(f"Updated user profile for {user_id}: team={team_name}, role={role}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating user profile for {user_id}: {e}")
+            return False
+    
+    async def get_user_profile(self, user_id: str) -> Optional[Dict]:
+        """
+        Get user profile including team, manager, and role from user_activity.
+        
+        Args:
+            user_id: User ID (email)
+            
+        Returns:
+            Dictionary with profile info or None if not found
+        """
+        try:
+            await self.connect()
+            user_activity_collection = self.database["user_activity"]
+            
+            user_doc = await user_activity_collection.find_one(
+                {"user_id": user_id},
+                {
+                    "user_id": 1,
+                    "user_email": 1,
+                    "user_name": 1,
+                    "team_name": 1,
+                    "manager_email": 1,
+                    "manager_name": 1,
+                    "role": 1
+                }
+            )
+            
+            if user_doc:
+                # Convert ObjectId to string if present
+                if "_id" in user_doc:
+                    user_doc["_id"] = str(user_doc["_id"])
+                return user_doc
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting user profile for {user_id}: {e}")
+            return None
 
 # Global instance
 mongodb_memory = MongoDBMemoryManager()
@@ -1199,6 +1317,22 @@ async def get_faqs_by_date(
 async def mark_session_ended(user_id: str, session_id: str):
     """Mark a session as ended in user_activity collection."""
     return await mongodb_memory.mark_session_ended(user_id, session_id)
+
+async def update_user_profile(
+    user_id: str,
+    team_name: str,
+    manager_email: str,
+    manager_name: str,
+    role: str
+) -> bool:
+    """Update user profile with team, manager, and role information."""
+    return await mongodb_memory.update_user_profile(
+        user_id, team_name, manager_email, manager_name, role
+    )
+
+async def get_user_profile(user_id: str) -> Optional[Dict]:
+    """Get user profile including team, manager, and role."""
+    return await mongodb_memory.get_user_profile(user_id)
 
 async def migrate_existing_data_to_user_activity():
     """Migration helper: Backfill user_activity collection from existing chat_sessions."""

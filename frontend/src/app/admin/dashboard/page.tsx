@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { getApiBase } from '@/lib/api';
+import { getApiBase, apiFetch } from '@/lib/api';
 import { getCurrentUser } from '@/lib/session-utils';
 import { isAdminEmail, ADMIN_EMAILS } from '@/constants/admins';
 import { User } from '@/types/chat';
@@ -113,12 +113,12 @@ export default function AdminDashboardPage() {
         } else {
           console.log('[DASHBOARD] No exclusions (all-time)');
         }
-        url = `${getApiBase()}/admin/users/summary${params.toString() ? `?${params.toString()}` : ''}`;
+        url = `/admin/users/summary${params.toString() ? `?${params.toString()}` : ''}`;
         console.log('[DASHBOARD] Fetching all-time stats from:', url);
         
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
+          method: 'GET',
           headers: {
-            'Content-Type': 'application/json',
             Authorization: `Bearer ${user.access_token}`
           }
         });
@@ -158,13 +158,13 @@ export default function AdminDashboardPage() {
         }
         params.append('limit', '100'); // Get top 100 rankers
         
-        url = `${getApiBase()}/admin/rankers?${params.toString()}`;
+        url = `/admin/rankers?${params.toString()}`;
         
         console.log('[DASHBOARD] Fetching rankers from:', url);
         
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
+          method: 'GET',
           headers: {
-            'Content-Type': 'application/json',
             Authorization: `Bearer ${user.access_token}`
           }
         });

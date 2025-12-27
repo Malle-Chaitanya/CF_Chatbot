@@ -102,6 +102,16 @@ class SessionStore:
         """
         await self.connect()
         
+        # ✅ STRICT IDENTITY: Email is mandatory - fail fast if missing
+        if not user_email or not user_email.strip():
+            raise ValueError("Cannot create session without user email")
+        
+        # ✅ IDENTITY RULE: Ensure user_id is email (normalize)
+        normalized_email = user_email.lower().strip()
+        if user_id != normalized_email:
+            logger.warning(f"[SESSION] user_id mismatch: {user_id} != {normalized_email}, using email")
+            user_id = normalized_email
+        
         # Generate secure session ID
         session_id = self._generate_session_id()
         
@@ -117,8 +127,8 @@ class SessionStore:
         
         session_doc = {
             "session_id": session_id,
-            "user_id": user_id,
-            "user_email": user_email.lower(),  # Normalize email
+            "user_id": user_id,  # ✅ Always email
+            "user_email": normalized_email,
             "user_name": user_name,
             "access_token": encrypted_access_token,
             "refresh_token": encrypted_refresh_token,

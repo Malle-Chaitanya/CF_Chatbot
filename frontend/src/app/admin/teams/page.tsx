@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session-utils';
-import { getApiBase } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { isAdminEmail } from '@/constants/admins';
 import { colorPalette } from '@/constants/colors';
 
@@ -145,15 +145,13 @@ export default function TeamsAnalyticsPage() {
         return;
       }
 
-      const apiBase = getApiBase();
-      console.log('[Teams Fetch] API Base:', apiBase);
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
 
-      const url = `${apiBase}/analytics/langfuse/teams/summary?time_filter=${filter}`;
-      console.log('[Teams Fetch] Attempting to fetch from:', url);
-      console.log('[Teams Fetch] Headers:', headers);
+      // apiFetch expects just the path, not the full URL - it adds the base automatically
+      const urlPath = `/analytics/langfuse/teams/summary?time_filter=${filter}`;
+      console.log('[Teams Fetch] Attempting to fetch path:', urlPath);
 
       try {
         const controller = new AbortController();
@@ -166,10 +164,9 @@ export default function TeamsAnalyticsPage() {
             controller.abort();
           }, 90000); // 90 second timeout
 
-          const response = await fetch(url, {
+          const response = await apiFetch(urlPath, {
             method: 'GET',
             headers,
-            credentials: 'include',
             signal: controller.signal,
           });
 
@@ -243,19 +240,16 @@ export default function TeamsAnalyticsPage() {
       const user = getCurrentUser(); // NOT async!
       if (!user) return;
 
-      const apiBase = getApiBase();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
 
-      const response = await fetch(
-        `${apiBase}/analytics/langfuse/teams/details/${encodeURIComponent(teamName)}?time_filter=${appliedFilter}`,
-        {
-          method: 'GET',
-          headers,
-          credentials: 'include',
-        }
-      );
+      // apiFetch expects just the path, not the full URL - it adds the base automatically
+      const urlPath = `/analytics/langfuse/teams/details/${encodeURIComponent(teamName)}?time_filter=${appliedFilter}`;
+      const response = await apiFetch(urlPath, {
+        method: 'GET',
+        headers,
+      });
 
       if (response.ok) {
         const data = await response.json();
