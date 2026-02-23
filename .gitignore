@@ -1,0 +1,12 @@
+# Environment and secrets
+.env
+
+# Virtual environment
+venv/
+
+# Ingested/data artifacts
+data/
+
+# Debug and runtime logs
+logs/
+rag_context_debug.log

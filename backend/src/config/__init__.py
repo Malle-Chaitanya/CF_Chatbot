@@ -1,1 +1,23 @@
 # Config package
+from .settings import Settings, get_settings
+from .collection_config import (
+    DEFAULT_COLLECTION_NAME,
+    BLOG_COLLECTION_NAME,
+    SHAREPOINT_COLLECTION_NAME,
+    JIRA_COLLECTION_NAME,
+    TRANSCRIPT_COLLECTION_NAME,
+    EMAIL_COLLECTION_NAME,
+    COLLECTION_REGISTRY,
+)
+
+__all__ = [
+    "Settings",
+    "get_settings",
+    "DEFAULT_COLLECTION_NAME",
+    "BLOG_COLLECTION_NAME",
+    "SHAREPOINT_COLLECTION_NAME",
+    "JIRA_COLLECTION_NAME",
+    "TRANSCRIPT_COLLECTION_NAME",
+    "EMAIL_COLLECTION_NAME",
+    "COLLECTION_REGISTRY",
+]

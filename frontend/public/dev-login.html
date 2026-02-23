@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RAG Dev Login</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 400px; margin: 2rem auto; padding: 1rem; text-align: center; }
+    button { padding: 0.75rem 1.5rem; font-size: 1rem; cursor: pointer; background: #0129ac; color: white; border: none; border-radius: 8px; }
+    button:hover { opacity: 0.9; }
+    .msg { margin-top: 1rem; color: #666; }
+    .err { color: #c00; }
+  </style>
+</head>
+<body>
+  <h1>RAG Dev Login</h1>
+  <p>Use this to sign in without Microsoft when running the RAG backend locally.</p>
+  <button id="btn">Sign in (dev)</button>
+  <p id="msg" class="msg"></p>
+  <script>
+    document.getElementById('btn').onclick = async function () {
+      const msg = document.getElementById('msg');
+      msg.textContent = 'Signing in...';
+      msg.className = 'msg';
+      try {
+        const base = window.location.origin;
+        const res = await fetch(base + '/api/proxy/auth/dev-login', { method: 'POST', credentials: 'include' });
+        if (!res.ok) throw new Error('Backend returned ' + res.status);
+        const data = await res.json();
+        const user = { id: data.user_id, name: data.name, email: data.email };
+        localStorage.setItem('user', JSON.stringify(user));
+        msg.textContent = 'Redirecting...';
+        window.location.href = base + '/chat/new';
+      } catch (e) {
+        msg.textContent = 'Error: ' + (e.message || e);
+        msg.className = 'msg err';
+      }
+    };
+  </script>
+</body>
+</html>
